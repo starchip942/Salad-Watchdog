@@ -10,7 +10,7 @@ interface Meta { photoW: number; photoH: number; fans: FanMeta[]; card?: [number
 const BASE_W = 2400;           // width the base image is exported at
 const TAU = 1.2;               // fan inertia time constant (s): spool up / coast down
 const SPIN_DIR = -1;           // blade curvature says clockwise as seen from the front
-const BLUR_RPM = [250, 800, 1500];
+const BLUR_RPM = [125, 400, 750];   // fans are shown at double speed, so they blur sooner
 
 export interface HeroInput { rpm: number[]; tempC: number | null; online: boolean }
 
@@ -111,7 +111,7 @@ export class Hero {
       this.rpm[i] += (target - this.rpm[i]) * (1 - Math.exp(-dt / TAU));
       if (target === 0 && this.rpm[i] < 3) this.rpm[i] = 0;     // zero-RPM mode: fully stopped
       // shown speed: real revolutions slowed down, capped, so the eye never sees wagon-wheel strobing
-      const shownDps = Math.min(this.rpm[i] * 1.1, 1240) * (reduced ? 0.15 : 1);
+      const shownDps = Math.min(this.rpm[i] * 2.2, 2480) * (reduced ? 0.15 : 1);
       this.angle[i] += SPIN_DIR * shownDps * dt * Math.PI / 180;
       if (this.rpm[i] > 0) moving = true;
     }
