@@ -398,7 +398,7 @@ namespace GpuWatchdog
                 if (Hold) { Log.Info("Games closed; Salad stays paused (you paused it)."); PausedForGame = false; SaveState(); return; }
                 PausedForGame = false;
                 Log.Info("Games closed → Salad chopping again.");
-                ChopNow("Game Mode");
+                ChopNow("Games closed");
             }
         }
 

@@ -134,14 +134,19 @@ namespace GpuWatchdog
                     var msg = l.Substring(i + 2);
                     var level = msg.StartsWith("Warning: ") ? "warn" : msg.StartsWith("Error: ") ? "error" : "info";
                     if (level != "info") msg = msg.Substring(msg.IndexOf(' ') + 1);
-                    var kind = IsPrivate(msg) ? "private" : cat == "earnings" ? "earnings" : null;
-                    Recent.Add(new LogEvent { id = "f" + Time.Epoch(dt) + "-" + (++seq), t = Time.Epoch(dt), level = level, msg = msg, Kind = kind, cat = cat });
+                    if (Trivial(msg)) continue;   // lines from older versions that are now debug-only
+                    var c = cat == "pc" ? CatOf(msg, null) : cat;
+                    var kind = IsPrivate(msg) ? "private" : c == "earnings" ? "earnings" : null;
+                    Recent.Add(new LogEvent { id = "f" + Time.Epoch(dt) + "-" + (++seq), t = Time.Epoch(dt), level = level, msg = msg, Kind = kind, cat = c });
                 }
               }
               Recent.Sort((a, b) => a.t.CompareTo(b.t));
             }
             catch { }
         }
+
+        static readonly string[] TrivialStarts = { "Earnings read", "Relay ", "Connected to the relay", "Can't reach the relay", "Lights", "Screen off", "Created the GPU Watchdog shortcut", "Website: ", "Panel: ", "Hardware check written", "Watchdog closed for the update", "Couldn't read earnings" };
+        static bool Trivial(string msg) => TrivialStarts.Any(t => msg.StartsWith(t, StringComparison.OrdinalIgnoreCase));
 
         static bool IsPrivate(string msg)
         {
