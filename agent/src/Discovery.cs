@@ -141,7 +141,7 @@ namespace GpuWatchdog
             try
             {
                 var code = System.Text.Encoding.ASCII.GetString(File.ReadAllBytes(@"C:\Program Files\Salad\resources\app.asar"));
-                foreach (var word in new[] { "isWorkloadRunning:", "isWorkloadRunning=", "ActiveWorkloadState", "ACTIVE_WORKLOAD_STATE", "activeWorkloadState:" })
+                foreach (var word in new[] { "isPausedIndefinitely:", "isPausedIndefinitely=", "pauseIndefinitely", "setIsPausedIndefinitely", "PausedIndefinitely(" })
                 {
                     int i = code.IndexOf(word), n = 0;
                     while (i >= 0 && n++ < 4)

@@ -633,11 +633,11 @@ namespace GpuWatchdog
                                 if (d == null) d = ui;
                             }
                             if (ui?.estNextHourHighUSD != null) SetNextHour(ui);
-                            else if ((DateTime.Now - lastNhDiag).TotalMinutes >= 10)
+                            if ((ui?.estNextHourHighUSD == null || ui.estNextHourHighUSD == 0) && (DateTime.Now - lastNhDiag).TotalMinutes >= 10)
                             {
                                 lastNhDiag = DateTime.Now;
                                 var at = text?.IndexOf("Next Hour", StringComparison.OrdinalIgnoreCase) ?? -1;
-                                Log.Debug("Next hour not on Salad's page: " + (text == null ? "no text (" + Earnings.LastError + ")" : at < 0 ? text.Length + " chars, no 'Next Hour'" : "unparsed: " + text.Substring(at, Math.Min(60, text.Length - at))));
+                                Log.Debug("Next hour check: " + (text == null ? "no text (" + Earnings.LastError + ")" : at < 0 ? text.Length + " chars, no 'Next Hour'" : "page says: " + text.Substring(at, Math.Min(60, text.Length - at))));
                             }
                             // Est. Next Hour: keep Salad's window parked invisibly so it can be read (see SaladPeek)
                             if (ui?.estNextHourHighUSD == null && ShouldPeek())
@@ -655,7 +655,8 @@ namespace GpuWatchdog
                                     }
                                 Log.Debug("Next hour from Salad: " + (got ? string.Format(Time.Inv, "${0:0.000}–${1:0.000}", nhLow, nhHigh) : "not readable (" + (Earnings.LastError ?? "no number on the page") + ")"));
                                 // don't keep trying (and opening Salad's window) if it doesn't work on this PC
-                                if (got) peekFails = 0; else if (++peekFails >= 3) { lastPeek = DateTime.Now.AddHours(2); peekFails = 0; }
+                                // a window you have open (or Salad still loading) isn't a failure of the invisible window
+                                if (got || !ok) peekFails = 0; else if (++peekFails >= 3) { lastPeek = DateTime.Now.AddHours(1); peekFails = 0; }
                             }
                         }
                     }
