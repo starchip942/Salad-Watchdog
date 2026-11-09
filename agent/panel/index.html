@@ -467,7 +467,7 @@ function renderMonitor(S) {
   const pmin = e && e.lastPayoutAt ? Math.max(0, Math.round((Date.now() / 1000 - e.lastPayoutAt) / 60)) : null;
   $("m-pay").innerHTML = e && isNum(e.lastPayoutUSD) ? `+$${e.lastPayoutUSD.toFixed(4)} <span style="color:var(--dim);font-weight:400;font-size:12.5px">· ${pmin < 1 ? "just now" : pmin < 60 ? pmin + " min ago" : Math.floor(pmin / 60) + " h " + (pmin % 60) + " min ago"}</span>` : "N/A";
   $("m-24").textContent = e && isNum(e.last24hUSD) ? (e.last24hUSD >= 0 ? "+" : "−") + "$" + Math.abs(e.last24hUSD).toFixed(4) : "N/A";
-  const nhTxt = e && isNum(e.estNextHourHighUSD) ? (Math.abs(e.estNextHourHighUSD - e.estNextHourLowUSD) < 0.0005 ? `$${e.estNextHourHighUSD.toFixed(3)}` : `$${e.estNextHourLowUSD.toFixed(3)} – $${e.estNextHourHighUSD.toFixed(3)}`) : null;
+  const nhTxt = e && isNum(e.estNextHourHighUSD) ? `$${e.estNextHourLowUSD.toFixed(4)} ~ $${e.estNextHourHighUSD.toFixed(4)}` : null;
   $("m-nh").innerHTML = nhTxt ?? `<span style="color:var(--dim);font-weight:400">—</span>`;
   const ago = e && e.updatedAt ? Math.round((Date.now() / 1000 - e.updatedAt) / 60) : null;
   $("m-earn-note").textContent = S.earningsStatus && S.earningsStatus !== "OK" ? S.earningsStatus + (e ? " Showing the last values read." : "") : e && !isNum(e.lastPayoutUSD) ? "Last payout appears the next time Salad adds to your balance." : "";

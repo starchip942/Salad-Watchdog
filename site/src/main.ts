@@ -134,7 +134,7 @@ function render() {
   $("earn").classList.toggle("hidden", !e);
   if (e) {
     $("e-bal").textContent = usd4(e.balanceUSD);
-    $("e-next").innerHTML = isNum(e.estNextHourHighUSD) ? (isNum(e.estNextHourLowUSD) && Math.abs(e.estNextHourHighUSD - e.estNextHourLowUSD) < 0.0005 ? usd4(e.estNextHourHighUSD).replace(/\d$/, "") : range3(e.estNextHourLowUSD, e.estNextHourHighUSD)) : "—";
+    $("e-next").innerHTML = isNum(e.estNextHourHighUSD) ? `${usd4(e.estNextHourLowUSD)} ~ ${usd4(e.estNextHourHighUSD)}` : "—";
     $("e-pay").innerHTML = isNum(e.lastPayoutUSD ?? null) ? `+$${e.lastPayoutUSD!.toFixed(4)} <small>· ${e.lastPayoutAt ? ago(Date.now() / 1000 - e.lastPayoutAt) : ""}</small>` : "N/A";
     const l24 = $("e-24"); l24.textContent = usd4(e.last24hUSD, true); l24.style.color = isNum(e.last24hUSD) ? "var(--green)" : "";
   }
