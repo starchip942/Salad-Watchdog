@@ -1,6 +1,8 @@
 import type { HistPoint, LogEvent, Telemetry } from "./types";
 
-export const RELAY: string = (import.meta.env.VITE_RELAY_URL as string | undefined)?.replace(/\/$/, "") ?? "";
+// Your PC's relay (not a secret: every visitor's browser connects to it). The build can override it.
+const DEFAULT_RELAY = "https://gpu-watchdog-relay.stelackos.workers.dev";
+export const RELAY: string = ((import.meta.env.VITE_RELAY_URL as string | undefined) || DEFAULT_RELAY).replace(/\/$/, "");
 // Demo data only when asked for explicitly (?demo), never by accident
 export const DEMO = new URLSearchParams(location.search).has("demo");
 export const NO_RELAY = !RELAY && !DEMO;

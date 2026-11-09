@@ -34,6 +34,7 @@ jobs:
       - id: url
         run: |
           u="${{ vars.RELAY_URL }}"
+          [ -z "$u" ] && u="https://gpu-watchdog-relay.stelackos.workers.dev"   # the relay your PC uses
           if [ -f relay/deploy.log ]; then f=$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' relay/deploy.log | head -1); [ -n "$f" ] && u="$f"; fi
           echo "url=$u" >> "$GITHUB_OUTPUT"
           echo "Relay: $u"
