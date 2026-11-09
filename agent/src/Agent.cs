@@ -52,6 +52,10 @@ namespace GpuWatchdog
             var st = Json.Load<Dictionary<string, object>>(Paths.Cfg("state.json"));
             Hold = Json.Bool(st, "hold") ?? false;
             PausedForGame = Json.Bool(st, "pausedForGame") ?? false;
+            // a Chop Now that was still being pushed through when the watchdog restarted carries on
+            var cu = (long)(Json.Num(st, "chopUntil") ?? 0); var cv = (long)(Json.Num(st, "chopVerifyUntil") ?? 0);
+            if (cu > Time.Now) { chopUntil = Math.Max(cu, Time.Now + 120); chopNextTry = Time.Now + 20; }
+            if (cv > Time.Now) { chopVerifyUntil = cv; chopNextTry = Time.Now + 20; }
             var e0 = Json.Load<EarningsData>(Paths.Cfg("earnings.json"));
             if (e0.balanceUSD != null) { LastPayoutUSD = e0.lastPayoutUSD; LastPayoutAt = e0.lastPayoutAt; if (e0.nextHourAt > 0 && e0.nextHourFrom == "salad" && false) { nhLow = e0.estNextHourLowUSD; nhHigh = e0.estNextHourHighUSD; nhAt = e0.nextHourAt; } Earn = e0; EarnStatus = "Last read " + Time.Short(e0.updatedAt) + "."; }
 
@@ -153,6 +157,7 @@ namespace GpuWatchdog
             if (now - lastGameCheck >= 2) { lastGameCheck = now; GameCheck(now); }
             if (Lock.Active && now - lastLockoutCheck >= 3) { lastLockoutCheck = now; EnforceLockout(); }
             ChopRetry(now);
+            if (chopUntil + chopVerifyUntil != savedChop) { savedChop = chopUntil + chopVerifyUntil; SaveState(); }
             Schedules(now);
             if (ShutdownAt > 0 && now > ShutdownAt + 120) ShutdownAt = 0;
 
@@ -550,7 +555,8 @@ namespace GpuWatchdog
 
         static string Label(string action) => action == "pc_off" ? "Turn PC off" : "Close Salad";
         void SaveSchedules() { lock (G) Json.Save(Paths.Cfg("schedules.json"), Sched); }
-        void SaveState() => Json.Save(Paths.Cfg("state.json"), new Dictionary<string, object> { { "hold", Hold }, { "pausedForGame", PausedForGame } });
+        void SaveState() => Json.Save(Paths.Cfg("state.json"), new Dictionary<string, object> { { "hold", Hold }, { "pausedForGame", PausedForGame }, { "chopUntil", chopUntil }, { "chopVerifyUntil", chopVerifyUntil } });
+        long savedChop;   // last chopUntil+verify written, so the file is only rewritten when these change
 
         // ---------------- commands (website and panel share these) ----------------
         public (bool ok, string msg) Command(string cmd, Dictionary<string, object> args, string who)

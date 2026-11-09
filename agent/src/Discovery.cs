@@ -135,7 +135,7 @@ namespace GpuWatchdog
             try
             {
                 var code = System.Text.Encoding.ASCII.GetString(File.ReadAllBytes(@"C:\Program Files\Salad\resources\app.asar"));
-                foreach (var word in new[] { "estimatedEarningsPerHour:", "estimatedEarningsPerHour=", "predictedEarnings", "earningsPerHour", "balanceNext24Hours" })
+                foreach (var word in new[] { "estimatedEarningsPerHour:", "balanceNext24Hours", "startActiveWorkloads", "StartActiveWorkloads", "chopNow", "ChopNow", "setUserIdle", "SetUserIdle", "setUserActive", "autoStart", "AutoStart" })
                 {
                     int i = code.IndexOf(word), n = 0;
                     while (i >= 0 && n++ < 4)
