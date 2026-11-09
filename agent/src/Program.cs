@@ -16,6 +16,8 @@ namespace GpuWatchdog
 {
     static class Program
     {
+        /// <summary>Closes the watchdog completely (set once the tray exists).</summary>
+        public static Action ExitApp;
         const string MutexName = "Global\\GpuWatchdogAgent2";
         const string ShowEventName = "Global\\GpuWatchdogAgent2.ShowPanel";
 
@@ -81,6 +83,7 @@ namespace GpuWatchdog
             var panel = new Panel();
             var tray = new Tray(agent, panel);
             agent.Notify += (t, m) => tray.Balloon(t, m);
+            ExitApp = () => tray.Invoke(new Action(() => tray.ExitQuietly()));
             agent.Start();
             panel.Start();
 

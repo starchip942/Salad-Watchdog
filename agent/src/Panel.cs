@@ -150,6 +150,15 @@ namespace GpuWatchdog
                 case "lights_cancel": return (true, Lights.Cancel());
                 case "lights_on": { var m = Lights.SignalRgb(true, out bool ok); return (ok, m); }
                 case "open_log": Process.Start("explorer.exe", "\"" + Paths.Logs + "\""); return (true, "Opened.");
+                case "halt_all":
+                    {
+                        // Halt: close Salad completely (app, service, its Linux jobs), then close the watchdog itself
+                        try { SaladPeek.Release(); } catch { }
+                        string res = Salad.Close(0);
+                        Log.Warn("Halted from the panel: " + res + " Watchdog closed.");
+                        System.Threading.Tasks.Task.Run(async () => { await System.Threading.Tasks.Task.Delay(1500); Program.ExitApp?.Invoke(); });
+                        return (true, res + " The watchdog is closing.");
+                    }
                 case "open_folder": Process.Start("explorer.exe", "\"" + Paths.Root + "\""); return (true, "Opened.");
                 case "password_set":
                     {

@@ -168,7 +168,7 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
       </div>
       <div class="g" style="grid-template-columns:1fr 1.45fr;align-items:stretch">
         <div class="glass c"><h3>Salad</h3>
-          <div class="state" id="m-salad">--</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div class="state" id="m-salad">--</div><button class="btn go small" data-cmd="salad_chop_now">▶ Chop Now</button></div>
           <div class="lbl" style="margin-top:14px">Salad Balance</div>
           <div class="bal num" id="m-bal">--</div>
           <div class="kv num"><div><div class="lbl">Last 24 h</div><div id="m-24" style="color:var(--green)">--</div></div><div><div class="lbl">Last payout</div><div id="m-pay">--</div></div><div style="grid-column:1/-1"><div class="lbl">Est. next hour</div><div id="m-nh">--</div></div></div>
@@ -187,7 +187,7 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
       <div class="h1"><h1>Controls</h1></div>
       <div class="g g3" style="align-items:start">
         <div class="glass c"><h3>Salad <span id="o-hold"></span></h3>
-          <button class="btn go" data-cmd="salad_chop_now" style="width:100%;margin-bottom:8px">▶ Start chopping (Chop Now)</button>
+          <button class="btn go" data-cmd="salad_chop_now" style="width:100%;margin-bottom:8px">▶ Chop Now</button>
           <div class="row2"><button class="btn" data-cmd="salad_pause">❚❚ Pause chopping</button><button class="btn" data-cmd="salad_off_now">✕ Close Salad</button></div>
           <button class="btn small hidden" id="clear-hold" data-cmd="hold_clear" style="width:100%;margin-top:8px">Clear hold</button>
         </div>
@@ -195,6 +195,7 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
           <button class="btn danger" data-confirm="pc_off_now" style="width:100%;margin-bottom:8px">⏻ Turn PC off now (30 s)</button>
           <div class="row2"><button class="btn" data-go="schedules">⏱ Schedule…</button><button class="btn" data-cmd="shutdown_cancel" id="cancel-sd">Cancel shutdown</button></div>
           <div class="stack" id="o-sched" style="margin-top:8px"></div>
+          <button class="btn danger small" data-confirm="halt_all" style="width:100%;margin-top:8px">■ Halt everything</button>
         </div>
         <div class="glass c" style="background:linear-gradient(135deg,rgba(155,140,255,.10),rgba(63,214,255,.04));border-color:rgba(155,140,255,.25)">
           <h3>Lights &amp; Screen off <span id="lights-text"></span></h3>
@@ -345,6 +346,7 @@ document.addEventListener("click", async e => {
   if (el.dataset.go) return go(el.dataset.go);
   if (el.dataset.cancel) return cmd("schedule_cancel", { id: el.dataset.cancel });
   if (el.dataset.set) { if (inSafety(el)) { P[el.dataset.set] = !el.classList.contains("on"); return renderSettings(); } return setSetting({ [el.dataset.set]: !el.classList.contains("on") }); }
+  if (el.dataset.confirm === "halt_all") { if (await confirmBox("Halt everything?", "<p>Force-closes Salad completely (app, service and its jobs), then closes the GPU Watchdog too. Nothing will restart Salad and the website stops updating until you open the watchdog again.</p>", "■ Halt")) cmd("halt_all"); return; }
   if (el.dataset.confirm === "pc_off_now") { if (await confirmBox("Turn the PC off?", "<p>Windows shuts down after a 30-second countdown; you can cancel it. Salad stops earning, and the PC can't be turned back on remotely.</p>", "⏻ Turn off")) cmd("pc_off_now"); return; }
   cmd(el.dataset.cmd);
 });
