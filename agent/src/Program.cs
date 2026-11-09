@@ -74,7 +74,7 @@ namespace GpuWatchdog
 
             Paths.Ensure();
             Conf.Load();
-            Log.StartSession("Watchdog started.");
+            Log.StartSession("Watchdog started.", restarted);
             Shortcut.EnsureDesktopShortcut();
 
             var agent = new Agent();

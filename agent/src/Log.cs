@@ -29,8 +29,9 @@ namespace GpuWatchdog
         static long seq;
         public static event Action<LogEvent> Added;
 
-        public static void StartSession(string startLine)
+        public static void StartSession(string startLine, bool afterUpdate = false)
         {
+            if (afterUpdate) { MigrateOld(); LoadTail(); Debug("Restarted into the new version."); return; }   // same session continues
             string last = null;
             try
             {
