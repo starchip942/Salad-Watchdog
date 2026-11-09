@@ -211,9 +211,9 @@ namespace GpuWatchdog
 
     /// <summary>
     /// "Est. Next Hour" only exists in Salad's own window (Salad's servers send it to the window, not to the background service).
-    /// So when you're away from the PC, the watchdog briefly opens Salad's window invisibly (fully transparent, off-screen),
-    /// reads the text the window shows (read-only, like a screen reader), and puts the window back in the tray where it was.
-    /// Nothing is clicked, typed or changed in Salad.
+    /// So the watchdog opens Salad's window once, invisibly (fully transparent, off-screen, no taskbar button), and leaves it
+    /// "parked" there so the number can be read every minute like a screen reader would. Nothing in Salad is clicked or changed.
+    /// The moment you open Salad yourself (tray icon), the window is put back to normal so you see it as usual.
     /// </summary>
     static class SaladPeek
     {
@@ -221,7 +221,7 @@ namespace GpuWatchdog
         [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc cb, IntPtr l);
         [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
         [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
-        [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int cmd);
+        [DllImport("user32.dll")] static extern bool IsWindow(IntPtr h);
         [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr h, int i);
         [DllImport("user32.dll")] static extern int SetWindowLong(IntPtr h, int i, int v);
         [DllImport("user32.dll")] static extern bool SetLayeredWindowAttributes(IntPtr h, uint key, byte alpha, uint flags);
@@ -229,69 +229,147 @@ namespace GpuWatchdog
         [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
         [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
         [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
+        [DllImport("user32.dll")] static extern bool AttachThreadInput(uint a, uint b, bool attach);
+        [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
+        [DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr h, System.Text.StringBuilder sb, int max);
         [StructLayout(LayoutKind.Sequential)] struct RECT { public int L, T, R, B; }
         const int GWL_EXSTYLE = -20, WS_EX_LAYERED = 0x80000, WS_EX_TOOLWINDOW = 0x80, WS_EX_APPWINDOW = 0x40000;
         const uint SWP_NOSIZE = 1, SWP_NOZORDER = 4, SWP_NOACTIVATE = 0x10, LWA_ALPHA = 2;
 
         public static string LastResult = "";
+        static IntPtr parked; static RECT orig; static int origEx; static DateTime parkedAt; static uint inputAtPark;
+        static readonly object Gate = new object();
+        static Thread guard;
 
-        static List<IntPtr> VisibleSalad()
+        public static bool Parked { get { lock (Gate) return parked != IntPtr.Zero && IsWindow(parked); } }
+
+        static HashSet<uint> Pids() => new HashSet<uint>(Process.GetProcessesByName("Salad").Select(p => (uint)p.Id));
+        static List<IntPtr> SaladWindows(bool visible, string cls = null)
         {
-            var pids = new HashSet<uint>(Process.GetProcessesByName("Salad").Select(p => (uint)p.Id));
-            var list = new List<IntPtr>();
-            EnumWindows((h, l) => { GetWindowThreadProcessId(h, out uint pid); if (pids.Contains(pid) && IsWindowVisible(h)) list.Add(h); return true; }, IntPtr.Zero);
+            var pids = Pids(); var list = new List<IntPtr>();
+            EnumWindows((h, l) =>
+            {
+                GetWindowThreadProcessId(h, out uint pid);
+                if (!pids.Contains(pid) || (visible && !IsWindowVisible(h))) return true;
+                if (cls != null) { var sb = new System.Text.StringBuilder(64); GetClassName(h, sb, 64); if (sb.ToString() != cls) return true; }
+                list.Add(h); return true;
+            }, IntPtr.Zero);
             return list;
         }
 
-        /// <summary>Returns the next-hour range, or null. Only call when Salad's app is running and its window is closed.</summary>
-        public static EarningsData Run()
+        /// <summary>Opens and parks Salad's window if it isn't parked yet. Returns true when a parked window is ready to read.</summary>
+        public static bool EnsureParked()
         {
-            if (!Salad.AppRunning() || !File.Exists(Salad.AppPath)) { LastResult = "Salad isn't running."; return null; }
-            if (VisibleSalad().Count > 0) { LastResult = "Salad's window is open; read directly."; return null; }
-            var before = new HashSet<IntPtr>(VisibleSalad());
+            if (Parked) return true;
+            if (!Salad.AppRunning()) { LastResult = "Salad isn't running."; return false; }
+            if (SaladWindows(true).Count > 0) { LastResult = "Salad's window is open; read directly."; return false; }
+            StartGuard();
             var fg = GetForegroundWindow();
-            IntPtr win = IntPtr.Zero; RECT orig = default(RECT); int origEx = 0;
+            IntPtr found = IntPtr.Zero;
+            var watchUntil = DateTime.Now.AddSeconds(14);
+            // watch for the window from the very first moment, so it's made invisible before it's painted
+            var watcher = new Thread(() =>
+            {
+                while (DateTime.Now < watchUntil && found == IntPtr.Zero)
+                {
+                    var w = SaladWindows(true);
+                    if (w.Count > 0) { found = w[0]; Park(found, fg); break; }
+                    Thread.Sleep(5);
+                }
+            }) { IsBackground = true };
+            watcher.Start();
             try
             {
-                // Opening Salad again (as you, through Explorer) makes the running Salad show its window
-                Process.Start(new ProcessStartInfo("explorer.exe", "\"" + Salad.AppPath + "\"") { UseShellExecute = false });
-                var until = DateTime.Now.AddSeconds(8);
-                while (DateTime.Now < until && win == IntPtr.Zero)
-                {
-                    foreach (var h in VisibleSalad()) if (!before.Contains(h)) { win = h; break; }
-                    if (win == IntPtr.Zero) Thread.Sleep(10);
-                }
-                if (win == IntPtr.Zero) { LastResult = "Salad's window didn't open."; return null; }
-                // invisible at once: fully transparent, no taskbar button, moved off-screen
-                GetWindowRect(win, out orig);
-                origEx = GetWindowLong(win, GWL_EXSTYLE);
-                SetWindowLong(win, GWL_EXSTYLE, (origEx | WS_EX_LAYERED | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW);
-                SetLayeredWindowAttributes(win, 0, 0, LWA_ALPHA);
-                SetWindowPos(win, IntPtr.Zero, -32000, -32000, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
-                if (fg != IntPtr.Zero) SetForegroundWindow(fg);
-                // give the page up to 20 s to show the forecast
-                var end = DateTime.Now.AddSeconds(20);
-                while (DateTime.Now < end)
-                {
-                    Thread.Sleep(1000);
-                    var text = Earnings.ReadSaladText();
-                    var d = text == null ? null : Earnings.Parse(text);
-                    if (d != null && d.estNextHourHighUSD != null) { LastResult = "OK"; return d; }
-                }
-                LastResult = "Salad's window opened but showed no next-hour estimate.";
-                return null;
+                // 1) open Salad again (as you, through Explorer): a running Salad shows its window
+                if (File.Exists(Salad.AppPath)) Process.Start(new ProcessStartInfo("explorer.exe", "\"" + Salad.AppPath + "\"") { UseShellExecute = false });
+                if (watcher.Join(5000) && found != IntPtr.Zero) { LastResult = "opened"; return true; }
+                // 2) the same message Windows sends when you click Salad's tray icon
+                foreach (var host in SaladWindows(false, "Electron_NotifyIconHostWindow"))
+                    for (int id = 1; id <= 4 && found == IntPtr.Zero; id++)
+                    {
+                        PostMessage(host, 0x8001 /*WM_APP+1*/, new IntPtr(id), new IntPtr(0x0201 /*WM_LBUTTONDOWN*/));
+                        PostMessage(host, 0x8001, new IntPtr(id), new IntPtr(0x0202 /*WM_LBUTTONUP*/));
+                        Thread.Sleep(150);
+                    }
+                if (watcher.Join(4000) && found != IntPtr.Zero) { LastResult = "opened (tray)"; return true; }
+                foreach (var host in SaladWindows(false, "Electron_NotifyIconHostWindow"))
+                    for (int id = 1; id <= 4 && found == IntPtr.Zero; id++) { PostMessage(host, 0x8001, new IntPtr(id), new IntPtr(0x0203 /*WM_LBUTTONDBLCLK*/)); Thread.Sleep(150); }
+                watcher.Join(5000);
+                LastResult = found != IntPtr.Zero ? "opened (tray, double-click)" : "Salad's window didn't open.";
+                return found != IntPtr.Zero;
             }
-            catch (Exception e) { LastResult = e.Message; return null; }
-            finally
+            catch (Exception e) { LastResult = e.Message; return false; }
+        }
+
+        static void Park(IntPtr h, IntPtr fg)
+        {
+            lock (Gate)
             {
-                if (win != IntPtr.Zero)
-                {
-                    // back to the tray, exactly as it was (so it opens normally next time you click Salad's icon)
-                    ShowWindow(win, 0);
-                    SetWindowPos(win, IntPtr.Zero, orig.L, orig.T, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
-                    SetWindowLong(win, GWL_EXSTYLE, origEx);
-                }
+                GetWindowRect(h, out orig);
+                origEx = GetWindowLong(h, GWL_EXSTYLE);
+                SetWindowLong(h, GWL_EXSTYLE, (origEx | WS_EX_LAYERED | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW);
+                SetLayeredWindowAttributes(h, 0, 0, LWA_ALPHA);
+                SetWindowPos(h, IntPtr.Zero, -32000, -32000, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+                parked = h; parkedAt = DateTime.Now; inputAtPark = Native.LastInputTick();
             }
+            GiveFocusBack(fg);
+        }
+
+        static void GiveFocusBack(IntPtr fg)
+        {
+            if (fg == IntPtr.Zero) return;
+            try
+            {
+                uint me = GetCurrentThreadId(), cur = GetWindowThreadProcessId(GetForegroundWindow(), out _);
+                AttachThreadInput(me, cur, true); SetForegroundWindow(fg); AttachThreadInput(me, cur, false);
+            }
+            catch { }
+        }
+
+        /// <summary>Puts the window back exactly as it was (visible, normal position).</summary>
+        public static void Release()
+        {
+            lock (Gate)
+            {
+                if (parked == IntPtr.Zero) return;
+                if (IsWindow(parked))
+                {
+                    SetWindowPos(parked, IntPtr.Zero, orig.L, orig.T, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+                    SetLayeredWindowAttributes(parked, 0, 255, LWA_ALPHA);
+                    SetWindowLong(parked, GWL_EXSTYLE, origEx);
+                }
+                parked = IntPtr.Zero;
+            }
+        }
+
+        static IntPtr lastFg;
+        static void StartGuard()
+        {
+            if (guard != null) return;
+            guard = new Thread(() =>
+            {
+                while (true)
+                {
+                    Thread.Sleep(200);
+                    try
+                    {
+                        IntPtr h; lock (Gate) h = parked;
+                        if (h == IntPtr.Zero) { lastFg = GetForegroundWindow(); continue; }
+                        if (!IsWindow(h)) { lock (Gate) parked = IntPtr.Zero; continue; }
+                        if (!IsWindowVisible(h)) { Release(); continue; }          // Salad hid it to the tray itself
+                        if (GetForegroundWindow() == h)
+                        {
+                            // you clicked Salad's tray icon (there was mouse/keyboard input since parking): show it normally
+                            if (Native.LastInputTick() != inputAtPark && (DateTime.Now - parkedAt).TotalSeconds > 2) { Release(); Log.Debug("Salad opened by you; window shown normally."); }
+                            else GiveFocusBack(lastFg);
+                        }
+                        else lastFg = GetForegroundWindow();
+                    }
+                    catch { }
+                }
+            }) { IsBackground = true };
+            guard.Start();
         }
     }
 }

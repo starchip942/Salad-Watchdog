@@ -182,7 +182,6 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
           <div class="sysrow"><div class="syshead"><h3>Storage</h3></div><div class="sysvals num" id="m-ssd"></div></div>
         </div>
       </div>
-      <div class="glass c" style="padding:12px 18px"><div id="m-status" class="statusrow"></div></div>
     </section>
 
     <!-- CONTROLS -->
@@ -268,6 +267,14 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
           </div>
         </div>
         <div class="stack" style="gap:16px">
+          <div class="glass c"><h3>General</h3>
+            <div class="set"><div>Show earnings on the website</div><button class="tog" data-set="showEarningsOnWebsite"></button></div>
+            <div class="set"><div>Website viewing needs the password</div><button class="tog" data-set="viewRequiresPassword"></button></div>
+            <div class="set"><div>Start hidden in the tray</div><button class="tog" data-set="startHiddenInTray"></button></div>
+            <div class="set"><div>Update interval when nobody is watching</div><div><input class="inp n num" data-num="sampleSecondsIdle"> s</div></div>
+            <div class="set"><div>Relay address</div><input class="inp" data-text="relayUrl" style="width:280px" placeholder="https://…workers.dev"></div>
+            <div class="set"><div>Data location<div class="d" id="dataloc"></div></div><button class="btn small" data-cmd="open_folder">Open folder</button></div>
+          </div>
           <details class="glass c fold"><summary><h3>Website password <span id="pw-sync"></span></h3></summary><div class="fold-body">
             <div class="g g2" style="gap:10px">
               <div><div class="lbl" style="margin-bottom:6px">New password</div><input class="inp" type="password" id="pw1" style="width:100%" autocomplete="new-password"></div>
@@ -279,14 +286,6 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
               <button class="btn small" id="pw-save">Save &amp; sync</button></div>
             <div class="msg" id="pw-msg"></div>
           </div></details>
-          <div class="glass c"><h3>General</h3>
-            <div class="set"><div>Show earnings on the website</div><button class="tog" data-set="showEarningsOnWebsite"></button></div>
-            <div class="set"><div>Website viewing needs the password</div><button class="tog" data-set="viewRequiresPassword"></button></div>
-            <div class="set"><div>Start hidden in the tray</div><button class="tog" data-set="startHiddenInTray"></button></div>
-            <div class="set"><div>Update interval when nobody is watching</div><div><input class="inp n num" data-num="sampleSecondsIdle"> s</div></div>
-            <div class="set"><div>Relay address</div><input class="inp" data-text="relayUrl" style="width:280px" placeholder="https://…workers.dev"></div>
-            <div class="set"><div>Data location<div class="d" id="dataloc"></div></div><button class="btn small" data-cmd="open_folder">Open folder</button></div>
-          </div>
         </div>
       </div>
     </section>
@@ -477,14 +476,7 @@ function renderMonitor(S) {
   const pair = (list, kind, fallback) => (list.length ? list : fallback).slice(0, 2).map(r => `<div><div class="lbl">${esc(r.name)}</div><div class="mv ${tc(r.tempC, kind)}">${deg(r.tempC)}</div></div>`).join("");
   $("m-ram").innerHTML = pair(t.ram, "ram", [{ name: "DIMM 1" }, { name: "DIMM 2" }]);
   $("m-ssd").innerHTML = pair(t.ssd, "ssd", [{ name: "SSD 1" }, { name: "SSD 2" }]);
-  const next = t.schedules.filter(x => !x.missed)[0];
-  $("m-status").innerHTML = [
-    ["Website", S.relay.connected ? "connected" : "not connected"],
-    ...(s.gameMode.activeGame ? [["Game running", esc(s.gameMode.activeGame)]] : []),
-    ...(S.lockout ? [["Safety stop", '<b style="color:var(--red)">LOCKED OUT</b>']] : !t.safety.enabled ? [["Safety stop", '<span style="color:var(--amber)">off</span>']] : []),
-    ["Next schedule", next ? (next.action === "pc_off" ? "PC off · " : "Close Salad · ") + fmtT(next.at) : "none"],
-    ...(t.shutdown.pendingAt ? [["Shutdown", `<b style="color:var(--red)">in ${Math.max(0, t.shutdown.pendingAt - Math.floor(Date.now() / 1000))} s</b>`]] : []),
-  ].map(([k, v]) => `<div><span>${k}</span><span>${v}</span></div>`).join("");
+
 }
 
 // ---------- games page ----------

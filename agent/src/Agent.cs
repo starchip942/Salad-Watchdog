@@ -98,6 +98,7 @@ namespace GpuWatchdog
         public void Stop()
         {
             stopping = true;
+            try { SaladPeek.Release(); } catch { }
             Relay.Stop();
             try { loop?.Join(3000); } catch { }
             sensors.Dispose();
@@ -557,15 +558,21 @@ namespace GpuWatchdog
                             if (ui != null && Earnings.Complete(ui))
                             {
                                 if (d == null) d = ui;
-                                if (ui.estNextHourHighUSD != null) SetNextHour(ui);
                             }
-                            // Away from the PC: peek at Salad's window invisibly every 15 minutes for "Est. Next Hour"
+                            if (ui?.estNextHourHighUSD != null) SetNextHour(ui);
+                            // Est. Next Hour: keep Salad's window parked invisibly so it can be read (see SaladPeek)
                             if (ui?.estNextHourHighUSD == null && ShouldPeek())
                             {
                                 lastPeek = DateTime.Now;
-                                var pk = SaladPeek.Run();
-                                if (pk != null) SetNextHour(pk);
-                                Log.Debug("Next-hour check: " + SaladPeek.LastResult + (pk != null ? string.Format(Time.Inv, " ${0:0.000}–${1:0.000}", pk.estNextHourLowUSD, pk.estNextHourHighUSD) : ""));
+                                var ok = SaladPeek.EnsureParked();
+                                Log.Debug("Next-hour window: " + SaladPeek.LastResult);
+                                if (ok)
+                                    for (int i = 0; i < 20; i++)
+                                    {
+                                        await Task.Delay(1000);
+                                        var t2 = Earnings.ReadSaladText(); var pk = t2 == null ? null : Earnings.Parse(t2);
+                                        if (pk?.estNextHourHighUSD != null) { SetNextHour(pk); break; }
+                                    }
                             }
                         }
                     }
@@ -600,10 +607,9 @@ namespace GpuWatchdog
         /// <summary>Only while you're away (no mouse/keyboard for 3 min), no game running, Salad chopping, at most every 15 min.</summary>
         bool ShouldPeek()
         {
-            if ((DateTime.Now - lastPeek).TotalMinutes < 15) return false;
-            if (ActiveGames.Count > 0 || SaladState != "chopping") return false;
-            uint idleMs = unchecked((uint)Environment.TickCount - Native.LastInputTick());
-            return idleMs > 180000;
+            if (SaladPeek.Parked) return (DateTime.Now - lastPeek).TotalMinutes >= 5;   // parked but no number yet: re-check now and then
+            if ((DateTime.Now - lastPeek).TotalMinutes < 10) return false;
+            return ActiveGames.Count == 0 && (SaladState == "chopping" || SaladState == "idle");
         }
 
         // ---------------- balance history (for the next-hour estimate) ----------------
