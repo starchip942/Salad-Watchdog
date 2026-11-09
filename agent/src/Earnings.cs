@@ -40,6 +40,8 @@ namespace GpuWatchdog
             if (m.Success) d.balanceUSD = Val(m.Groups[1].Value, m.Groups[2].Value);
             m = Regex.Match(t, @"Est\.?\s*Next\s*Hour\W*" + Money + @"\s*[~\-–]\s*" + Money, RegexOptions.IgnoreCase);
             if (m.Success) { d.estNextHourLowUSD = Val(m.Groups[1].Value, m.Groups[2].Value); d.estNextHourHighUSD = Val(m.Groups[3].Value, m.Groups[4].Value); }
+            else if ((m = Regex.Match(t, @"Est\.?\s*Next\s*Hour\W*" + Money, RegexOptions.IgnoreCase)).Success)
+                d.estNextHourLowUSD = d.estNextHourHighUSD = Val(m.Groups[1].Value, m.Groups[2].Value);   // Salad shows one number ($0.00) when there's no job
             m = Regex.Match(t, @"Last\s*24\s*Hours\W*?([+\-−])?\s*" + Money, RegexOptions.IgnoreCase);
             if (m.Success)
             {
