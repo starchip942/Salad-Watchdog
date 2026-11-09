@@ -136,8 +136,7 @@ function render() {
   $("earn").classList.toggle("hidden", !e);
   if (e) {
     $("e-bal").textContent = usd4(e.balanceUSD);
-    const nhAge = e.nextHourAt ? Date.now() / 1000 - e.nextHourAt : null;
-    $("e-next").innerHTML = isNum(e.estNextHourHighUSD) ? `${range3(e.estNextHourLowUSD, e.estNextHourHighUSD)} <small>· ${nhAge != null ? ago(nhAge) : ""}</small>` : "—";
+    $("e-next").innerHTML = isNum(e.estNextHourHighUSD) ? (isNum(e.estNextHourLowUSD) && Math.abs(e.estNextHourHighUSD - e.estNextHourLowUSD) < 0.0005 ? usd4(e.estNextHourHighUSD).replace(/\d$/, "") : range3(e.estNextHourLowUSD, e.estNextHourHighUSD)) : "—";
     $("e-pay").innerHTML = isNum(e.lastPayoutUSD ?? null) ? `+$${e.lastPayoutUSD!.toFixed(4)} <small>· ${e.lastPayoutAt ? ago(Date.now() / 1000 - e.lastPayoutAt) : ""}</small>` : "N/A";
     const l24 = $("e-24"); l24.textContent = usd4(e.last24hUSD, true); l24.style.color = isNum(e.last24hUSD) ? "var(--green)" : "";
   }
@@ -174,7 +173,7 @@ function renderStatus() { /* status pills removed: the banners say when the PC i
 function renderBanners() {
   const t = S.t, out: string[] = [];
   const lo = t?.safety?.lockout;
-  if (lo) out.push(`<div class="banner red"><b>⚠ Salad locked out at ${Math.round(lo.tempC)} °C · ${pcTime(lo.at, tz(), true)}</b>Check cooling (fans, dust, airflow). This can only be cleared on the PC itself.</div>`);
+  if (lo) out.push(`<div class="banner red"><b>⚠ Salad locked out at ${Math.round(lo.tempC)} °C · ${pcTime(lo.at, tz(), true)}</b>Check cooling (fans, dust, airflow). Clear it on the PC.</div>`);
   if (t?.safety?.sensorFail) out.push(`<div class="banner amber"><b>GPU temperature can't be read</b>The safety stop won't act on missing data. Check the PC.</div>`);
   const pend = t?.shutdown?.pendingAt;
   if (S.online && pend && pend * 1000 > Date.now()) {

@@ -168,7 +168,7 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
         </div>
       </div>
       <div class="g" style="grid-template-columns:1fr 1.45fr;align-items:stretch">
-        <div class="glass c"><h3>Salad <span id="m-earn-upd"></span></h3>
+        <div class="glass c"><h3>Salad</h3>
           <div class="state" id="m-salad">--</div>
           <div class="lbl" style="margin-top:14px">Salad Balance</div>
           <div class="bal num" id="m-bal">--</div>
@@ -254,6 +254,7 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
             <div class="set"><div>Watch sensor</div><div class="seg" id="sf-sensor"><button data-v="core">Core</button><button data-v="hotspot">Hotspot</button><button data-v="either">Either</button></div></div>
             <div class="set"><div>Core limit<div class="d num" id="sf-core-now"></div></div><div><input class="inp n num" data-num="safetyCoreLimitC"> °C</div></div>
             <div class="set"><div>Hotspot limit<div class="d num" id="sf-hot-now"></div></div><div><input class="inp n num" data-num="safetyHotspotLimitC"> °C</div></div>
+            <div class="set"><div>CPU limit<div class="d num" id="sf-cpu-now"></div></div><div><input class="inp n num" data-num="safetyCpuLimitC"> °C</div></div>
             <div class="set"><div>Trigger after</div><div><input class="inp n num" data-num="safetySamples"> readings in a row</div></div>
           </div>
           <div class="glass c"><h3>GPU profile </h3>
@@ -380,7 +381,7 @@ async function refresh() {
   const t = S.telemetry, g = t.gpu, s = t.salad, st = S.settings;
   // banners (lockout, old watchdog, sensors)
   const b = [];
-  if (S.lockout) b.push(`<div class="banner red"><b>⚠ Salad locked out at ${Math.round(S.lockout.tempC)} °C · ${fmtT(S.lockout.at)}</b>The GPU ${esc(S.lockout.sensor)} reached the safety limit, so Salad was force-closed and kept closed. Check the fans, dust and airflow before allowing it again.<br><button class="btn" id="clear-lock">I checked the PC (fans, dust, airflow), allow Salad again</button></div>`);
+  if (S.lockout) b.push(`<div class="banner red"><b>⚠ Salad locked out at ${Math.round(S.lockout.tempC)} °C · ${fmtT(S.lockout.at)}</b>The ${S.lockout.sensor === "cpu" ? "CPU" : "GPU " + esc(S.lockout.sensor)} reached the safety limit, so Salad was force-closed and kept closed. Check the fans, dust and airflow before allowing it again.<br><button class="btn" id="clear-lock">I checked the PC (fans, dust, airflow), allow Salad again</button></div>`);
   if (S.oldWatchdog) b.push(`<div class="banner amber"><b>The old GPU Watchdog is running</b>Two watchdogs would fight over Salad. Close the old one from its tray icon (right-click → Exit).</div>`);
   if (t.safety.sensorFail) b.push(`<div class="banner amber"><b>GPU temperature can't be read</b>The safety stop won't act on missing data.</div>`);
   if (!st.relayUrl) b.push(`<div class="banner amber"><b>Website not set up yet</b>Everything works on this PC; the website connection is added during setup.</div>`);
@@ -398,6 +399,7 @@ async function refresh() {
   document.querySelectorAll('[data-cmd="salad_chop_now"]').forEach(x => x.disabled = s.state === "locked_out");
   renderSettings();
   $("sf-core-now").textContent = isNum(g.coreC) ? `now ${Math.round(g.coreC)} °C` : "now N/A";
+  $("sf-cpu-now").textContent = isNum(t.cpu.tempC) ? `now ${Math.round(t.cpu.tempC)} °C` : "now N/A";
   $("sf-hot-now").textContent = isNum(g.hotspotC) ? `now ${Math.round(g.hotspotC)} °C` : "N/A on this card";
   $("cancel-sd").disabled = !t.shutdown.pendingAt;
   $("dataloc").textContent = st.dataFolder;
@@ -465,10 +467,9 @@ function renderMonitor(S) {
   const pmin = e && e.lastPayoutAt ? Math.max(0, Math.round((Date.now() / 1000 - e.lastPayoutAt) / 60)) : null;
   $("m-pay").innerHTML = e && isNum(e.lastPayoutUSD) ? `+$${e.lastPayoutUSD.toFixed(4)} <span style="color:var(--dim);font-weight:400;font-size:12.5px">· ${pmin < 1 ? "just now" : pmin < 60 ? pmin + " min ago" : Math.floor(pmin / 60) + " h " + (pmin % 60) + " min ago"}</span>` : "N/A";
   $("m-24").textContent = e && isNum(e.last24hUSD) ? (e.last24hUSD >= 0 ? "+" : "−") + "$" + Math.abs(e.last24hUSD).toFixed(4) : "N/A";
-  const nhAgo = e && e.nextHourAt ? Math.round((Date.now() / 1000 - e.nextHourAt) / 60) : null;
-  $("m-nh").innerHTML = e && isNum(e.estNextHourHighUSD) ? `$${e.estNextHourLowUSD.toFixed(3)} – $${e.estNextHourHighUSD.toFixed(3)} <span style="color:var(--dim);font-weight:400;font-size:12.5px">· read ${nhAgo < 1 ? "just now" : nhAgo + " min ago"}</span>` : `<span style="color:var(--dim);font-weight:400;font-size:12.5px">read from Salad when you're away from the PC</span>`;
+  const nhTxt = e && isNum(e.estNextHourHighUSD) ? (Math.abs(e.estNextHourHighUSD - e.estNextHourLowUSD) < 0.0005 ? `$${e.estNextHourHighUSD.toFixed(3)}` : `$${e.estNextHourLowUSD.toFixed(3)} – $${e.estNextHourHighUSD.toFixed(3)}`) : null;
+  $("m-nh").innerHTML = nhTxt ?? `<span style="color:var(--dim);font-weight:400">—</span>`;
   const ago = e && e.updatedAt ? Math.round((Date.now() / 1000 - e.updatedAt) / 60) : null;
-  $("m-earn-upd").textContent = ago == null ? "" : ago < 1 ? "updated just now" : `updated ${ago} min ago`;
   $("m-earn-note").textContent = S.earningsStatus && S.earningsStatus !== "OK" ? S.earningsStatus + (e ? " Showing the last values read." : "") : e && !isNum(e.lastPayoutUSD) ? "Last payout appears the next time Salad adds to your balance." : "";
   $("m-cpuname").textContent = t.cpu.name || "";
   $("m-cpu").innerHTML = `<span class="${tc(t.cpu.tempC, "cpu")}">${deg(t.cpu.tempC)}</span>`;

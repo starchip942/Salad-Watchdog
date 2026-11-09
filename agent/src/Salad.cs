@@ -85,6 +85,20 @@ namespace GpuWatchdog
             return left.Count == 0 ? "Salad has been closed." : "Tried to close Salad, but " + Words(left) + " is still running.";
         }
 
+        /// <summary>
+        /// Emergency only: stops ALL of WSL (every Linux distro and the WSL virtual machine), since Salad's workloads run there.
+        /// Not used for normal pause/close.
+        /// </summary>
+        public static string ShutdownAllWsl()
+        {
+            Proc.Run(Proc.System32("wsl.exe"), "--shutdown", 30000);
+            foreach (var name in new[] { "wsl", "wslhost", "wslrelay", "wslservice" })
+                foreach (var p in Process.GetProcessesByName(name)) { try { p.Kill(); } catch { } }
+            Thread.Sleep(1000);
+            var o = Proc.Run(Proc.System32("wsl.exe"), "-l --running -q", 8000, Encoding.Unicode).Replace("\0", "").Trim();
+            return o.Length == 0 ? "All WSL/Linux tasks stopped." : "WSL still reports running distros.";
+        }
+
         /// <summary>Start Salad like it starts with Windows: service, then the app with only its tray icon, as you (not as admin).</summary>
         public static string Launch()
         {

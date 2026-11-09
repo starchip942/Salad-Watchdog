@@ -146,8 +146,8 @@ namespace GpuWatchdog
             catch { }
         }
 
-        static readonly string[] TrivialStarts = { "Earnings read", "Relay ", "Connected to the relay", "Can't reach the relay", "Lights", "Screen off", "Created the GPU Watchdog shortcut", "Website: ", "Panel: ", "Hardware check written", "Watchdog closed for the update", "Couldn't read earnings" };
-        static bool Trivial(string msg) => TrivialStarts.Any(t => msg.StartsWith(t, StringComparison.OrdinalIgnoreCase));
+        static readonly string[] TrivialStarts = { "Earnings read", "Relay ", "Connected to the relay", "Can't reach the relay", "Lights", "Screen off", "Created the GPU Watchdog shortcut", "Website: ", "Panel: ", "Hardware check written", "Watchdog closed for the update", "Couldn't read earnings", "Sensors:", "Watchdog started (new version)", "A new version", "Website relay set", "Website password synced" };
+        static bool Trivial(string msg) => TrivialStarts.Any(t => msg.StartsWith(t, StringComparison.OrdinalIgnoreCase)) || msg.Contains("°C average");
 
         static bool IsPrivate(string msg)
         {
@@ -171,7 +171,7 @@ namespace GpuWatchdog
             if (DateTime.Now < end) return;
             var startFmt = periodStart.ToString("tt", Time.Inv) == end.ToString("tt", Time.Inv) ? "h:mm" : "h:mm tt";
             var when = periodStart.ToString("MM/dd/yyyy", Time.Inv) + " " + periodStart.ToString(startFmt, Time.Inv) + "-" + end.ToString("h:mm tt", Time.Inv);
-            Add("info", string.Format(Time.Inv, "{0}°C average (peak {1}°C)", Math.Round(sum / count, MidpointRounding.AwayFromZero), Math.Round(max)), null, end, when);
+            if (false) Add("info", string.Format(Time.Inv, "{0}°C average (peak {1}°C)", Math.Round(sum / count, MidpointRounding.AwayFromZero), Math.Round(max)), null, end, when);
             periodStart = DateTime.Now >= end.AddMinutes(15) ? DateTime.Now : end;
             sum = 0; count = 0; max = 0;
         }

@@ -65,7 +65,7 @@ namespace GpuWatchdog
             sensors.Open();
             var r = sensors.Read();
             Last = r;
-            Log.Info($"Sensors: GPU {(sensors.NvmlOk ? "OK" : "unavailable (" + sensors.NvmlError + ")")}, hotspot {(r.GpuHotspot != null ? "OK" : "N/A")}, CPU {(r.CpuTemp != null ? "OK" : "N/A")}, " +
+            Log.Debug($"Sensors: GPU {(sensors.NvmlOk ? "OK" : "unavailable (" + sensors.NvmlError + ")")}, hotspot {(r.GpuHotspot != null ? "OK" : "N/A")}, CPU {(r.CpuTemp != null ? "OK" : "N/A")}, " +
                      $"RAM {r.Ram.Count(x => x.tempC != null)}/2, SSD {r.Ssd.Count(x => x.tempC != null)}/{Math.Max(2, r.Ssd.Count)}.");
             if (Lock.Active) Log.Error($"Emergency lockout is still active (GPU reached {Lock.TempC:0} °C at {Time.Short(Lock.At)}). Salad stays off until you clear it in the panel.");
             if (Hold) Log.Info("Salad hold still active from earlier: it won't restart after games until you press Start chopping.");
@@ -164,6 +164,12 @@ namespace GpuWatchdog
         void Safety(Reading r, long now)
         {
             var s = Conf.S;
+            // CPU: its own check, so a missing GPU reading never hides a hot CPU
+            if (s.SafetyEnabled && !Lock.Active && r.CpuTemp != null && r.CpuTemp >= s.SafetyCpuLimitC)
+            {
+                if (++cpuOver >= Math.Max(1, s.SafetySamples)) { cpuOver = 0; Emergency("cpu", r.CpuTemp.Value, now); return; }
+            }
+            else cpuOver = 0;
             double? core = r.GpuCore, hot = r.GpuHotspot;
             bool noData = s.SafetySensor == "hotspot" ? hot == null : s.SafetySensor == "either" ? core == null && hot == null : core == null;
             if (noData)
@@ -186,6 +192,8 @@ namespace GpuWatchdog
             Emergency(which, val, now);
         }
 
+        int cpuOver;
+        static string What(string sensor) => sensor == "cpu" ? "CPU" : "GPU " + sensor;
         void Emergency(string sensor, double temp, long now)
         {
             lock (G)
@@ -195,11 +203,11 @@ namespace GpuWatchdog
                 Json.Save(Paths.Cfg("lockout.json"), Lock);
                 SaveState();
             }
-            Log.Error($"GPU {sensor} reached {temp:0} °C (limit {(sensor == "hotspot" ? Conf.S.SafetyHotspotLimitC : Conf.S.SafetyCoreLimitC)} °C). Emergency stop: closing Salad for good.");
+            Log.Error($"{What(sensor)} reached {temp:0} °C (limit {(sensor == "cpu" ? Conf.S.SafetyCpuLimitC : sensor == "hotspot" ? Conf.S.SafetyHotspotLimitC : Conf.S.SafetyCoreLimitC)} °C). Emergency stop: closing Salad and all WSL/Linux tasks.");
             string res;
-            lock (ActionGate) res = Salad.Close(3000);
+            lock (ActionGate) { res = Salad.Close(3000); res += " " + Salad.ShutdownAllWsl(); }
             Log.Error($"{res} Salad locked out at {temp:0} °C. Check cooling (fans, dust, airflow), then clear it in the panel on this PC.");
-            Notify?.Invoke("GPU Watchdog: Salad locked out", $"GPU reached {temp:0} °C. Salad was closed. Check cooling, then clear the lockout in the panel.");
+            Notify?.Invoke("GPU Watchdog: Salad locked out", $"{What(sensor)} reached {temp:0} °C. Salad was closed. Check cooling, then clear the lockout in the panel.");
             UpdateSaladState();
             SendTelemetry();
         }
@@ -208,7 +216,7 @@ namespace GpuWatchdog
         {
             if (!Salad.AnyRunning() && !distroRunning) return;
             Log.Warn("Salad started again during the emergency lockout; closing it again.");
-            lock (ActionGate) Salad.Close(1000);
+            lock (ActionGate) { Salad.Close(1000); Salad.ShutdownAllWsl(); }
         }
 
         public (bool ok, string msg) ClearLockout()
@@ -239,13 +247,20 @@ namespace GpuWatchdog
             if (st != SaladState && SaladState != "unknown" && st == "not_running" && !Lock.Active) PausedByUs = false;
             if (st != SaladState && SaladState != "unknown")
             {
-                Log.Info("Salad: " + Nice(SaladState) + " → " + Nice(st) + ".");
                 SaladState = st;
+                stateSince = Time.Now;
                 SendTelemetry();      // tell the website straight away
             }
             SaladState = st;
+            // the log only gets a state once it has held for 5 minutes (short blips between jobs aren't worth a line)
+            if (st != loggedState && st != "unknown" && Time.Now - stateSince >= 300)
+            {
+                if (loggedState != null) Log.Info("Salad: " + Nice(loggedState) + " → " + Nice(st) + ".");
+                loggedState = st;
+            }
         }
 
+        long stateSince = Time.Now; string loggedState;
         static string Nice(string st) => st == "not_running" ? "not running" : st == "locked_out" ? "locked out" : st;
 
         /// <summary>GPU load over the last ~20 seconds says whether a Salad job is really running.</summary>
@@ -561,7 +576,7 @@ namespace GpuWatchdog
                             }
                             if (ui?.estNextHourHighUSD != null) SetNextHour(ui);
                             // Est. Next Hour: keep Salad's window parked invisibly so it can be read (see SaladPeek)
-                            if (ui?.estNextHourHighUSD == null && ShouldPeek())
+                            if (false && ui?.estNextHourHighUSD == null && ShouldPeek())
                             {
                                 lastPeek = DateTime.Now;
                                 var ok = SaladPeek.EnsureParked();
@@ -584,7 +599,13 @@ namespace GpuWatchdog
                         bool paid = RecordBalance(d.balanceUSD.Value);
                         // the next-hour range from Salad's window, kept until a newer one is read (shown for up to 2 hours)
                         if (nhAt > 0 && Time.Now - nhAt < 7200) { d.estNextHourLowUSD = nhLow; d.estNextHourHighUSD = nhHigh; d.nextHourAt = nhAt; d.nextHourFrom = "salad"; }
-                        else { d.estNextHourLowUSD = d.estNextHourHighUSD = null; d.nextHourAt = 0; }
+                        else
+                        {
+                            // Salad's window isn't open: estimate from what you actually earned over the last 1-3 hours
+                            var h = HourlyFromHistory();
+                            if (h != null && SaladState == "chopping") { d.estNextHourLowUSD = h.Item1; d.estNextHourHighUSD = h.Item2; d.nextHourAt = Time.Now; d.nextHourFrom = "history"; }
+                            else { d.estNextHourLowUSD = d.estNextHourHighUSD = null; d.nextHourAt = 0; }
+                        }
                         d.lastPayoutUSD = LastPayoutUSD; d.lastPayoutAt = LastPayoutAt;
                         Earn = d; EarnStatus = "OK";
                         try { Json.Save(Paths.Cfg("earnings.json"), d); } catch { }
@@ -656,7 +677,7 @@ namespace GpuWatchdog
             var s = Conf.S;
             object earnings = null;
             if (Earn != null && (!forWebsite || s.ShowEarningsOnWebsite))
-                earnings = new Dictionary<string, object> { { "balanceUSD", Earn.balanceUSD }, { "estNextHourLowUSD", Earn.estNextHourLowUSD }, { "estNextHourHighUSD", Earn.estNextHourHighUSD }, { "last24hUSD", Earn.last24hUSD }, { "updatedAt", Earn.updatedAt }, { "lastPayoutUSD", Earn.lastPayoutUSD }, { "lastPayoutAt", Earn.lastPayoutAt > 0 ? (object)Earn.lastPayoutAt : null }, { "nextHourAt", Earn.nextHourAt > 0 ? (object)Earn.nextHourAt : null } };
+                earnings = new Dictionary<string, object> { { "balanceUSD", Earn.balanceUSD }, { "estNextHourLowUSD", Earn.estNextHourLowUSD }, { "estNextHourHighUSD", Earn.estNextHourHighUSD }, { "last24hUSD", Earn.last24hUSD }, { "updatedAt", Earn.updatedAt }, { "lastPayoutUSD", Earn.lastPayoutUSD }, { "lastPayoutAt", Earn.lastPayoutAt > 0 ? (object)Earn.lastPayoutAt : null }, { "nextHourFrom", Earn.nextHourFrom }, { "nextHourAt", Earn.nextHourAt > 0 ? (object)Earn.nextHourAt : null } };
             List<ScheduleItem> sched; lock (G) sched = Sched.Items.ToList();
             var t = new Dictionary<string, object>
             {

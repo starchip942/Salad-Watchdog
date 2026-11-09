@@ -102,7 +102,7 @@ namespace GpuWatchdog
                         { "password", new Dictionary<string, object> { { "synced", s.PwSyncedVer == s.PwVer }, { "isDefault", s.PwVer <= 1 } } },
                         { "settings", new Dictionary<string, object> {
                             { "safetyEnabled", s.SafetyEnabled }, { "safetySensor", s.SafetySensor }, { "safetyCoreLimitC", s.SafetyCoreLimitC },
-                            { "safetyHotspotLimitC", s.SafetyHotspotLimitC }, { "safetySamples", s.SafetySamples },
+                            { "safetyHotspotLimitC", s.SafetyHotspotLimitC }, { "safetyCpuLimitC", s.SafetyCpuLimitC }, { "safetySamples", s.SafetySamples },
                             { "gameResumeDelaySec", s.GameResumeDelaySec },
                             { "importSteam", s.ImportSteam }, { "importGameFolders", s.ImportGameFolders },
                             { "screenOffDelaySec", s.ScreenOffDelaySec }, { "screenOffEvenIfLightsFail", s.ScreenOffEvenIfLightsFail },
@@ -208,6 +208,7 @@ namespace GpuWatchdog
             if (sensor == "core" || sensor == "hotspot" || sensor == "either") { if (sensor != s.SafetySensor) changes.Add("safetySensor"); s.SafetySensor = sensor; }
             s.SafetyCoreLimitC = Int("safetyCoreLimitC", s.SafetyCoreLimitC, 60, 95);
             s.SafetyHotspotLimitC = Int("safetyHotspotLimitC", s.SafetyHotspotLimitC, 70, 110);
+            s.SafetyCpuLimitC = Int("safetyCpuLimitC", s.SafetyCpuLimitC, 60, 100);
             s.SafetySamples = Int("safetySamples", s.SafetySamples, 1, 30);
             s.GameResumeDelaySec = Int("gameResumeDelaySec", s.GameResumeDelaySec, 0, 600);
             s.ImportSteam = B("importSteam", s.ImportSteam);
@@ -223,7 +224,7 @@ namespace GpuWatchdog
             if (url != null && url.Trim() != s.RelayUrl) { s.RelayUrl = url.Trim(); changes.Add("relayUrl"); }
             Conf.Save();
             if (changes.Count == 0) return (true, "No changes.");
-            if (changes.Any(c => c.StartsWith("safety"))) Log.Info($"Safety settings changed on the PC: {(s.SafetyEnabled ? "on" : "OFF")}, sensor {s.SafetySensor}, core {s.SafetyCoreLimitC} °C, hotspot {s.SafetyHotspotLimitC} °C, {s.SafetySamples} readings.");
+            if (changes.Any(c => c.StartsWith("safety"))) Log.Info($"Safety settings changed on the PC: {(s.SafetyEnabled ? "on" : "OFF")}, sensor {s.SafetySensor}, core {s.SafetyCoreLimitC} °C, hotspot {s.SafetyHotspotLimitC} °C, CPU {s.SafetyCpuLimitC} °C, {s.SafetySamples} readings.");
             if (changes.Contains("importSteam") || changes.Contains("importGameFolders")) Games.Rescan(true);
             if (vr != s.ViewRequiresPassword) Agent.I.Relay.Send(new Dictionary<string, object> { { "type", "info" }, { "viewRequiresPassword", s.ViewRequiresPassword } });
             Agent.I.SendTelemetry();

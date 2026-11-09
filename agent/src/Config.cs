@@ -27,6 +27,7 @@ namespace GpuWatchdog
         public bool SafetyEnabled = true;
         public string SafetySensor = "core";    // core | hotspot | either
         public int SafetyCoreLimitC = 85;
+        public int SafetyCpuLimitC = 90;        // CPU package temperature that also triggers the emergency stop
         public int SafetyHotspotLimitC = 95;
         public int SafetySamples = 3;           // consecutive 1-second readings at/over the limit
 
