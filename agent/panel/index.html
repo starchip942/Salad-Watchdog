@@ -164,7 +164,6 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
         </div>
         <div class="mh-right">
           <canvas id="hero-canvas" aria-label="Your graphics card, fans turning at the real speed"></canvas>
-          <div class="mh-cap" id="m-limit"></div>
         </div>
       </div>
       <div class="g" style="grid-template-columns:1fr 1.45fr;align-items:stretch">
@@ -460,7 +459,6 @@ function renderMonitor(S) {
   $("m-fan").innerHTML = f && isNum(f.pct) ? `${f.pct}<small>%</small>` : "N/A";
   $("m-vram").innerHTML = isNum(g.vramUsedMB) ? `${(g.vramUsedMB / 1024).toFixed(1)}<small> / ${Math.round(g.vramTotalMB / 1024)} GB</small>` : "N/A";
   $("m-vram-bar").style.width = isNum(g.vramUsedMB) ? (g.vramUsedMB / g.vramTotalMB * 100) + "%" : "0";
-  $("m-limit").textContent = `Safety limit ${t.safety.limitC} °C${t.safety.enabled ? "" : " · OFF"}`;
   $("m-salad").textContent = (LABEL[s.state] || s.state) + (s.hold && s.state !== "locked_out" ? " · hold" : ""); $("m-salad").className = "state " + s.state;
   const e = s.earnings;
   $("m-bal").textContent = e && isNum(e.balanceUSD) ? "$" + e.balanceUSD.toFixed(4) : "N/A";

@@ -129,7 +129,6 @@ function render() {
   if (s.hold && s.state !== "locked_out") st.textContent += " · hold";
   st.className = "state " + s.state;
   const sf = t.safety;
-  $("safety-limit").innerHTML = sf ? `${sf.limitC} °C` : "--";
   const e = s.earnings;
   $("earn").classList.toggle("hidden", !e);
   if (e) {
