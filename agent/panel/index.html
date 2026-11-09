@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GPU Watchdog — Control Panel</title>
+<style>
+:root{--bg:#07090c;--line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.12);--text:#e9eef4;--mute:#8a96a6;--dim:#5b6676;
+  --cyan:#3fd6ff;--green:#44e08a;--amber:#ffb547;--red:#ff4d5e;--violet:#9b8cff;--salad:#b6f24a;color-scheme:dark}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:Inter,"Segoe UI Variable","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-size:14px}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0}
+.num{font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.lbl{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);font-weight:600}
+.t-cool{color:var(--cyan)}.t-ok{color:var(--green)}.t-warm{color:var(--amber)}.t-hot{color:var(--red)}.na{color:var(--dim)}
+.app{display:flex;height:100%}
+nav{width:212px;flex:none;border-right:1px solid var(--line);padding:18px 12px;display:flex;flex-direction:column;gap:3px;background:linear-gradient(180deg,#0b0f14,#090c10)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.12em;font-size:12px;padding:4px 12px 18px}
+.brand b{width:22px;height:22px;border-radius:7px;background:conic-gradient(from 200deg,var(--cyan),var(--green),var(--amber),var(--cyan));display:grid;place-items:center}
+.brand b::after{content:"";width:12px;height:12px;border-radius:4px;background:var(--bg)}
+nav a{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;font-size:13.5px;color:#aeb8c5;cursor:pointer;user-select:none}
+nav a:hover{background:rgba(255,255,255,.03)}
+nav a.on{background:rgba(63,214,255,.09);color:#fff;box-shadow:inset 2px 0 0 var(--cyan)}
+nav a i{font-style:normal;width:18px;text-align:center;opacity:.85}
+nav .foot{margin-top:auto;font-size:11px;color:var(--dim);padding:10px 12px;line-height:1.6}
+main{flex:1;overflow:auto;padding:22px 26px 40px;display:flex;flex-direction:column;gap:16px;min-width:0}
+.h1{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.h1 h1{font-size:20px;font-weight:600}
+.strip{display:flex;gap:8px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:7px;padding:6px 11px;border-radius:999px;border:1px solid var(--line2);background:rgba(255,255,255,.03);font-size:12px;font-weight:500;white-space:nowrap}
+.pill.salad{border-color:rgba(182,242,74,.35);color:var(--salad);background:rgba(182,242,74,.07)}
+.pill.bad{border-color:rgba(255,77,94,.45);color:#ff8a95}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--dim)}.dot.on{background:var(--green);box-shadow:0 0 10px var(--green)}
+.glass{background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.015));border:1px solid var(--line);border-radius:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 20px 40px -20px rgba(0,0,0,.6)}
+.c{padding:16px 18px;min-width:0}
+.c h3{font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#c3ccd7;font-weight:700;margin-bottom:12px;display:flex;justify-content:space-between;gap:10px}
+.c h3 span{letter-spacing:0;text-transform:none;font-weight:500;color:var(--dim)}
+.g{display:grid;gap:16px}.g3{grid-template-columns:repeat(3,1fr)}.g2{grid-template-columns:1fr 1fr}
+@media (max-width:1100px){.g3{grid-template-columns:1fr 1fr}}
+.tt{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.tt>div{padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.025);border:1px solid var(--line)}
+.tt .v{font-size:24px;font-weight:500;margin-top:4px}.tt .v small{font-size:12px;color:var(--mute)}
+.tt .s{font-size:11px;color:var(--dim);margin-top:3px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:0 14px;border-radius:11px;border:1px solid var(--line2);background:rgba(255,255,255,.04);font-weight:600;font-size:13px}
+.btn:hover{background:rgba(255,255,255,.07)}.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.go{border-color:rgba(182,242,74,.4);color:var(--salad);background:rgba(182,242,74,.08)}
+.btn.danger{border-color:rgba(255,77,94,.35);color:#ff8a95;background:rgba(255,77,94,.07)}
+.btn.violet{border-color:rgba(155,140,255,.4);color:#c9c0ff;background:rgba(155,140,255,.08)}
+.btn.small{min-height:34px;font-size:12.5px;padding:0 12px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stack{display:grid;gap:8px}
+.set{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:10px 0;border-top:1px solid var(--line)}
+.set:first-of-type{border-top:0}.set .d{font-size:11.5px;color:var(--dim);margin-top:2px}
+.tog{width:38px;height:22px;border-radius:999px;background:rgba(255,255,255,.12);position:relative;flex:none;cursor:pointer;border:0}
+.tog::after{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#cfd6df;transition:left .15s}
+.tog.on{background:var(--green)}.tog.on::after{left:19px;background:#08200f}
+.inp{height:36px;border-radius:9px;border:1px solid var(--line2);background:rgba(0,0,0,.35);color:var(--text);padding:0 12px;font-size:13px;min-width:0}
+.inp.n{width:84px;text-align:right}
+.seg{display:flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden}
+.seg button{padding:8px 13px;font-size:12.5px;color:var(--mute)}.seg button.on{background:rgba(63,214,255,.12);color:#fff}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:9px;background:rgba(255,255,255,.04);border:1px solid var(--line2);font-size:12.5px}
+.chip small{color:var(--dim)}.chip button{color:var(--dim)}
+.banner{border-radius:14px;padding:13px 16px;font-size:13px;line-height:1.5}
+.banner b{display:block;font-size:15px;color:#fff;margin-bottom:2px}
+.banner.red{background:linear-gradient(135deg,rgba(255,77,94,.22),rgba(255,77,94,.08));border:1px solid rgba(255,77,94,.5);color:#ffd5d9}
+.banner.amber{background:rgba(255,181,71,.09);border:1px solid rgba(255,181,71,.4);color:#ffe2b8}
+.banner .btn{margin-top:10px;display:inline-flex}
+.log-row{display:grid;grid-template-columns:118px 46px 1fr;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:12.5px;align-items:baseline}
+.log-row:first-child{border-top:0}.log-row .tm{color:var(--dim);font-size:11.5px}
+.lv{font-size:9.5px;font-weight:700;letter-spacing:.1em;padding:2px 5px;border-radius:5px;text-align:center;text-transform:uppercase}
+.lv.info{color:var(--cyan);background:rgba(63,214,255,.09)}.lv.warn{color:var(--amber);background:rgba(255,181,71,.1)}.lv.error{color:var(--red);background:rgba(255,77,94,.1)}
+.lv.private{color:var(--violet);background:rgba(155,140,255,.1)}
+.ring{width:74px;height:74px;border-radius:50%;display:grid;place-items:center;flex:none}
+.ring b{width:62px;height:62px;border-radius:50%;background:#0d1016;display:grid;place-items:center;font-size:22px;font-weight:600}
+.msg{font-size:12.5px;color:var(--mute);min-height:18px}.msg.ok{color:var(--green)}.msg.bad{color:#ff8a95}
+.str{display:flex;gap:4px;margin-top:8px}.str i{flex:1;height:4px;border-radius:3px;background:rgba(255,255,255,.1)}
+.list{display:flex;flex-direction:column;gap:6px;max-height:340px;overflow:auto}
+.li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.025);border:1px solid var(--line);font-size:13px}
+.li small{color:var(--dim)}
+.tag{font-size:10.5px;padding:2px 7px;border-radius:6px;background:rgba(63,214,255,.1);color:var(--cyan)}
+.tag.run{background:rgba(255,181,71,.12);color:var(--amber)}
+dialog{margin:auto;border:1px solid var(--line2);border-radius:18px;background:#10141a;color:var(--text);padding:20px;max-width:560px;width:92%}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+dialog h2{font-size:17px;margin-bottom:8px}
+dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
+.hidden{display:none!important}
+.big{font-size:42px;font-weight:300;letter-spacing:-.04em}
+.photo{position:relative;border-radius:14px;overflow:hidden;height:150px;background:#000 url(/img/card-photo.webp) 72% 46%/175% no-repeat}
+.photo::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(7,9,12,.9),rgba(7,9,12,.2) 60%)}
+.photo>div{position:absolute;z-index:1;left:16px;top:14px}
+.mon-hero{display:grid;grid-template-columns:1fr 1.2fr;min-height:330px;overflow:hidden}
+.mh-left{padding:22px 24px}
+.mbig{font-size:96px;font-weight:200;letter-spacing:-.05em;line-height:.95;margin-top:8px}
+.mbig sup{font-size:30px;font-weight:300;vertical-align:top;margin-left:8px;color:var(--mute);letter-spacing:.04em;line-height:1.5}
+.mrow{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 18px;margin-top:20px;padding-top:16px;border-top:1px solid var(--line2)}
+.mrow .v{font-size:24px;font-weight:400;margin-top:4px}.mrow .v small{font-size:13px;color:var(--mute)}
+.mh-right{position:relative;min-height:340px;background:radial-gradient(ellipse 60% 55% at 50% 55%,rgba(63,214,255,.05),transparent 70%)}
+.mh-right canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.mh-cap{position:absolute;left:0;right:0;bottom:12px;text-align:center;font-size:11px;color:var(--dim)}
+.mh-spark{z-index:2}
+.mh-spark{position:absolute;left:18px;right:18px;bottom:14px}
+.mh-spark .cap{font-size:11px;color:var(--dim);margin-top:4px}
+.spark{display:block;width:100%}
+.g4{grid-template-columns:1.25fr 1fr 1fr 1fr}
+@media (max-width:1150px){.g4{grid-template-columns:1fr 1fr}}
+.state{font-size:20px;font-weight:600}
+.state.chopping{color:var(--salad)}.state.paused,.state.idle{color:var(--amber)}.state.locked_out{color:var(--red)}.state.not_running{color:var(--mute)}
+.bal{font-size:34px;font-weight:600;letter-spacing:-.03em;margin-top:2px}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:15px;font-weight:600}
+.kv .lbl{margin-bottom:4px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mv{font-size:30px;font-weight:400;margin-top:6px}.mv small{font-size:14px;color:var(--mute)}
+.hs{font-size:11.5px;color:var(--dim);margin-top:10px;line-height:1.5}
+.bar{height:4px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:8px}
+.bar>i{display:block;height:100%;width:0;border-radius:4px;background:#3f8cff;transition:width .8s}
+.bolt{font-size:.62em;margin-right:5px;vertical-align:.18em}
+.kvlist>div{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:13px}
+.kvlist>div:first-child{border-top:0}.kvlist span:first-child{color:var(--mute)}
+.sys{display:flex;flex-direction:column;gap:0;padding-top:8px;padding-bottom:8px}
+.sysrow{display:grid;grid-template-columns:150px 1fr;align-items:center;gap:16px;padding:12px 0;border-top:1px solid var(--line);flex:1}
+.sysrow:first-child{border-top:0}
+.syshead h3{margin:0}.syshead span{display:block;font-size:11.5px;color:var(--dim);margin-top:4px}
+.sysvals{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.sysvals .mv{font-size:26px;margin-top:4px}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav>
+    <div class="brand"><b></b>GPU WATCHDOG</div>
+    <a data-p="monitor" class="on"><i>◉</i>Monitor</a>
+    <a data-p="controls"><i>⏻</i>Controls</a>
+    <a data-p="games"><i>🎮</i>Salad &amp; Game Mode</a>
+    <a data-p="schedules"><i>⏱</i>Schedules</a>
+    <a data-p="safety"><i>⚠</i>Safety &amp; Settings</a>
+    <a data-p="log"><i>≣</i>Event log</a>
+    <div class="foot">Closing this window keeps the watchdog running in the tray.<br><span id="datadir"></span></div>
+  </nav>
+  <main id="main">
+    <div id="banners" class="stack"></div>
+
+    <!-- MONITOR -->
+    <section data-page="monitor" class="stack" style="gap:16px">
+      <div class="h1"><h1>Monitor</h1><div class="strip" id="strip"></div></div>
+      <div class="glass mon-hero">
+        <div class="mh-left">
+          <div class="lbl" id="m-gpuname">GPU temperature</div>
+          <div class="mbig num" id="m-gpu">--</div>
+          <div class="mrow num">
+            <div><div class="lbl">Core</div><div class="v" id="m-core">--</div></div>
+            <div><div class="lbl">Hotspot</div><div class="v" id="m-hot">--</div></div>
+            <div><div class="lbl">Load</div><div class="v" id="m-util">--</div></div>
+            <div><div class="lbl">Power</div><div class="v" id="m-pow">--</div></div>
+            <div><div class="lbl">Fans</div><div class="v" id="m-fan">--</div></div>
+            <div><div class="lbl">VRAM</div><div class="v" id="m-vram">--</div><div class="bar"><i id="m-vram-bar"></i></div></div>
+          </div>
+          <div class="hs" id="m-hot-note"></div>
+        </div>
+        <div class="mh-right">
+          <canvas id="hero-canvas" aria-label="Your graphics card, fans turning at the real speed"></canvas>
+          <div class="mh-cap" id="m-limit"></div>
+        </div>
+      </div>
+      <div class="g" style="grid-template-columns:1fr 1.45fr;align-items:stretch">
+        <div class="glass c"><h3>Salad <span id="m-earn-upd"></span></h3>
+          <div class="state" id="m-salad">--</div>
+          <div class="lbl" style="margin-top:14px">Balance</div>
+          <div class="bal num" id="m-bal">--</div>
+          <div class="kv num"><div><div class="lbl">Last 24 h</div><div id="m-24" style="color:var(--green)">--</div></div><div><div class="lbl">Last payout</div><div id="m-pay">--</div></div></div>
+          <div class="hs" id="m-earn-note"></div>
+        </div>
+        <div class="glass c sys">
+          <div class="sysrow"><div class="syshead"><h3>CPU</h3><span id="m-cpuname"></span></div>
+            <div class="sysvals"><div><div class="lbl">Temperature</div><div class="mv num" id="m-cpu">--</div></div><div><div class="lbl">Power Draw</div><div class="mv num" id="m-cpupow">--</div></div></div></div>
+          <div class="sysrow"><div class="syshead"><h3>Memory</h3><span>2 DIMMs</span></div><div class="sysvals num" id="m-ram"></div></div>
+          <div class="sysrow"><div class="syshead"><h3>Storage</h3><span>2 SSDs</span></div><div class="sysvals num" id="m-ssd"></div></div>
+        </div>
+      </div>
+      <div class="g" style="grid-template-columns:1fr 1.6fr">
+        <div class="glass c"><h3>Status</h3><div id="m-status" class="kvlist"></div></div>
+        <div class="glass c"><h3>Latest events <span><a style="color:var(--cyan);cursor:pointer" data-go="log">Full log →</a></span></h3><div id="m-log"></div></div>
+      </div>
+    </section>
+
+    <!-- CONTROLS -->
+    <section data-page="controls" class="stack hidden" style="gap:16px">
+      <div class="h1"><h1>Controls</h1><div class="strip" id="strip3"></div></div>
+      <div class="g g3">
+        <div class="glass c"><h3>Salad <span id="o-hold"></span></h3>
+          <button class="btn go" data-cmd="salad_chop_now" style="width:100%;margin-bottom:8px">▶ Start chopping (Chop Now)</button>
+          <div class="row2"><button class="btn" data-cmd="salad_pause">❚❚ Pause chopping</button><button class="btn" data-cmd="salad_off_now">✕ Close Salad</button></div>
+          <div class="set" style="margin-top:10px;border-top:1px solid var(--line)"><div>Game Mode<div class="d" id="o-gm"></div></div><button class="tog" data-set="gameModeEnabled"></button></div>
+          <button class="btn small hidden" id="clear-hold" data-cmd="hold_clear" style="width:100%">Clear hold</button>
+        </div>
+        <div class="glass c"><h3>PC power <span>no password needed here</span></h3>
+          <button class="btn danger" data-confirm="pc_off_now" style="width:100%;margin-bottom:8px">⏻ Turn PC off now (30 s)</button>
+          <div class="row2"><button class="btn" data-go="schedules">⏱ Schedule…</button><button class="btn" data-cmd="shutdown_cancel" id="cancel-sd">Cancel shutdown</button></div>
+          <div style="margin-top:12px;font-size:12px;color:var(--mute)">Scheduled</div><div class="stack" id="o-sched" style="margin-top:7px"></div>
+        </div>
+        <div class="glass c" style="background:linear-gradient(135deg,rgba(155,140,255,.10),rgba(63,214,255,.04));border-color:rgba(155,140,255,.25)">
+          <h3>Lights &amp; Screen off <span>Salad keeps running</span></h3>
+          <div style="display:flex;gap:16px;align-items:center;min-height:74px">
+            <div class="ring" id="ring"><b class="num" id="ring-n">☾</b></div>
+            <div style="font-size:13px;line-height:1.55" id="lights-text">Turns SignalRGB lighting off now, then the monitors after <span id="delay-txt">20</span> s. The PC stays awake (not sleep).</div>
+          </div>
+          <div class="row2" style="margin-top:14px"><button class="btn violet" data-cmd="lights_off">☾ Lights &amp; Screen Off</button><button class="btn" data-cmd="lights_cancel">Cancel</button></div>
+        </div>
+      </div>
+      <div class="glass c"><h3>Recent events <span><a style="color:var(--cyan);cursor:pointer" data-go="log">Full log →</a></span></h3><div id="o-log"></div></div>
+    </section>
+
+    <!-- SALAD & GAME MODE -->
+    <section data-page="games" class="stack hidden" style="gap:16px">
+      <div class="h1"><h1>Salad &amp; Game Mode</h1><div class="strip" id="strip2"></div></div>
+      <div class="g g2">
+        <div class="glass c"><h3>Game Mode <span>reads the process list only · no hooks</span></h3>
+          <div class="set"><div>Pause chopping while a game runs<div class="d">Chop Now again when all games have closed</div></div><button class="tog" data-set="gameModeEnabled"></button></div>
+          <div class="set"><div>Resume delay after the last game closes</div><div><input class="inp n num" data-num="gameResumeDelaySec"> s</div></div>
+          <div class="set"><div>Import Steam games<div class="d">every Steam library</div></div><button class="tog" data-set="importSteam"></button></div>
+          <div class="set"><div>Import game folders<div class="d">D:\Games, X:\XboxGames, Epic, GOG on every drive</div></div><button class="tog" data-set="importGameFolders"></button></div>
+          <div class="set"><div>Now running</div><div id="g-active" style="color:var(--amber)">no game</div></div>
+          <div class="msg" id="g-msg"></div>
+        </div>
+        <div class="glass c"><h3>Add a game <span>for programs outside those folders</span></h3>
+          <div style="display:flex;gap:8px"><input class="inp" id="g-name" placeholder="Program name, e.g. KingdomCome.exe" style="flex:1"><button class="btn small" id="g-add">Add</button></div>
+          <div style="display:flex;gap:8px;margin-top:10px"><select class="inp" id="g-running" style="flex:1"><option>Add from running programs…</option></select><button class="btn small" id="g-refresh">↻</button></div>
+          <div style="display:flex;gap:8px;margin-top:10px"><input class="inp" id="g-folder" placeholder="Extra game folder, e.g. E:\MyGames" style="flex:1"><button class="btn small" id="g-addfolder">Add folder</button></div>
+          <div class="stack" id="g-extra" style="margin-top:12px"></div>
+        </div>
+      </div>
+      <div class="glass c"><h3>Games that pause Salad <span id="g-count"></span></h3>
+        <input class="inp" id="g-filter" placeholder="Search" style="width:100%;margin-bottom:10px">
+        <div class="list" id="g-list"></div>
+      </div>
+    </section>
+
+    <!-- SCHEDULES -->
+    <section data-page="schedules" class="stack hidden" style="gap:16px">
+      <div class="h1"><h1>Schedules</h1><span class="pill" id="tz"></span></div>
+      <div class="g g2">
+        <div class="glass c"><h3>New schedule</h3>
+          <div class="seg" id="s-action" style="margin-bottom:10px"><button class="on" data-v="pc_off">Turn PC off</button><button data-v="salad_off">Close Salad</button></div>
+          <div class="seg" id="s-mode" style="margin-bottom:12px"><button class="on" data-v="at">At a time</button><button data-v="in">In … minutes</button></div>
+          <div id="s-at"><input type="time" class="inp" id="s-time" value="07:00" style="font-size:28px;height:58px;width:200px;text-align:center"></div>
+          <div id="s-in" class="hidden"><input type="number" class="inp" id="s-min" value="30" min="1" max="1440" style="font-size:28px;height:58px;width:200px;text-align:center"> minutes</div>
+          <p style="font-size:12px;color:var(--dim);margin:10px 0" id="s-help">Next 07:00 on this PC. Once the PC is off it can't be turned back on remotely.</p>
+          <button class="btn go" id="s-go">Schedule</button>
+          <div class="msg" id="s-msg" style="margin-top:8px"></div>
+        </div>
+        <div class="glass c"><h3>Scheduled <span>stored on this PC · survive restarts</span></h3><div class="stack" id="s-list"></div></div>
+      </div>
+    </section>
+
+    <!-- SAFETY & SETTINGS -->
+    <section data-page="safety" class="stack hidden" style="gap:16px">
+      <div class="h1"><h1>Safety &amp; Settings</h1><span class="pill" id="lock-pill"></span></div>
+      <div class="g g2" style="align-items:start">
+        <div class="stack" style="gap:16px">
+          <div class="glass c" style="border-color:rgba(255,77,94,.25)"><h3>Emergency auto-kill <span>works even with the internet down</span></h3>
+            <div class="set"><div>Enabled<div class="d">Force-closes Salad and locks it out until you clear it here</div></div><button class="tog" data-set="safetyEnabled"></button></div>
+            <div class="set"><div>Watch sensor</div><div class="seg" id="sf-sensor"><button data-v="core">Core</button><button data-v="hotspot">Hotspot</button><button data-v="either">Either</button></div></div>
+            <div class="set"><div>Core limit<div class="d num" id="sf-core-now"></div></div><div><input class="inp n num" data-num="safetyCoreLimitC"> °C</div></div>
+            <div class="set"><div>Hotspot limit<div class="d num" id="sf-hot-now"></div></div><div><input class="inp n num" data-num="safetyHotspotLimitC"> °C</div></div>
+            <div class="set"><div>Trigger after<div class="d">ignores single glitchy readings</div></div><div><input class="inp n num" data-num="safetySamples"> readings in a row</div></div>
+            <div style="font-size:11.5px;color:var(--dim);margin-top:6px">These can only be changed here on the PC, never from the website.</div>
+          </div>
+          <div class="glass c"><h3>Lights &amp; Screen</h3>
+            <div class="set"><div>Screen-off delay</div><div><input class="inp n num" data-num="screenOffDelaySec"> s</div></div>
+            <div class="set"><div>Turn the screen off even if the lights fail</div><button class="tog" data-set="screenOffEvenIfLightsFail"></button></div>
+            <div class="set"><div>Lights back on<div class="d">SignalRGB lighting</div></div><button class="btn small" data-cmd="lights_on">Turn lights on</button></div>
+          </div>
+        </div>
+        <div class="stack" style="gap:16px">
+          <div class="glass c"><h3>Website password <span id="pw-sync"></span></h3>
+            <div class="g g2" style="gap:10px">
+              <div><div class="lbl" style="margin-bottom:6px">New password</div><input class="inp" type="password" id="pw1" style="width:100%" autocomplete="new-password"></div>
+              <div><div class="lbl" style="margin-bottom:6px">Confirm</div><input class="inp" type="password" id="pw2" style="width:100%" autocomplete="new-password"></div>
+            </div>
+            <div class="str" id="pw-str"><i></i><i></i><i></i><i></i></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:10px">
+              <span style="font-size:11.5px;color:var(--amber)" id="pw-hint">Longer is safer. 6 digits can be guessed by a determined attacker.</span>
+              <button class="btn small" id="pw-save">Save &amp; sync</button></div>
+            <div class="msg" id="pw-msg"></div>
+          </div>
+          <div class="glass c"><h3>General</h3>
+            <div class="set"><div>Show earnings on the website<div class="d">anyone with the link can see them</div></div><button class="tog" data-set="showEarningsOnWebsite"></button></div>
+            <div class="set"><div>Website viewing needs the password<div class="d">off: anyone with the link sees the stats</div></div><button class="tog" data-set="viewRequiresPassword"></button></div>
+            <div class="set"><div>Start hidden in the tray</div><button class="tog" data-set="startHiddenInTray"></button></div>
+            <div class="set"><div>Update every … s when nobody is watching<div class="d">every second while someone is</div></div><div><input class="inp n num" data-num="sampleSecondsIdle"> s</div></div>
+            <div class="set"><div>Relay address</div><input class="inp" data-text="relayUrl" style="width:280px" placeholder="https://…workers.dev"></div>
+            <div class="set"><div>Data location<div class="d" id="dataloc"></div></div><button class="btn small" data-cmd="open_folder">Open folder</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- LOG -->
+    <section data-page="log" class="stack hidden" style="gap:16px">
+      <div class="h1"><h1>Event log</h1><div class="strip"><button class="btn small" data-cmd="open_log">Open log file</button></div></div>
+      <div class="glass c">
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+          <input class="inp" id="l-q" placeholder="Search the log" style="flex:1;min-width:200px">
+          <div class="seg" id="l-f"><button class="on" data-v="all">All</button><button data-v="info">Info</button><button data-v="warn">Warnings</button><button data-v="error">Errors</button></div>
+        </div>
+        <div id="l-list"></div>
+        <button class="btn small" id="l-more" style="width:100%;margin-top:10px">Load older</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<dialog id="dlg"><h2 id="dlg-t"></h2><div id="dlg-b"></div>
+  <div class="row2" style="margin-top:14px"><button class="btn" id="dlg-no">Cancel</button><button class="btn danger" id="dlg-yes">OK</button></div></dialog>
+
+<script src="/hero.js"></script>
+<script>
+const TOKEN = new URLSearchParams(location.search).get("t") || "";
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const api = (p, body) => fetch(p, { method: body ? "POST" : "GET", headers: { "X-Panel-Token": TOKEN, "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined }).then(r => r.json());
+let S = null, page = "monitor", toast = $("g-msg");
+const isNum = v => typeof v === "number" && isFinite(v);
+const tc = (c, k = "gpu") => { if (!isNum(c)) return "na"; const [a, b, d] = k === "gpu" ? [45, 72, 83] : k === "cpu" ? [45, 75, 88] : [40, 55, 70]; return c < a ? "t-cool" : c < b ? "t-ok" : c < d ? "t-warm" : "t-hot"; };
+const deg = v => isNum(v) ? `${Math.round(v)}<small> °C</small>` : `<span class="na">N/A</span>`;
+const fmtT = t => new Date(t * 1000).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" });
+const LABEL = { not_running: "Not running", idle: "Idle / waiting", paused: "Paused", chopping: "Chopping", locked_out: "Locked out", unknown: "Checking…" };
+
+// ---------- navigation ----------
+function go(p) { page = p; document.querySelectorAll("nav a").forEach(a => a.classList.toggle("on", a.dataset.p === p));
+  document.querySelectorAll("[data-page]").forEach(s => s.classList.toggle("hidden", s.dataset.page !== p));
+  if (p === "log") loadLog(true); if (p === "games") loadLibrary(); }
+document.querySelectorAll("nav a").forEach(a => a.onclick = () => go(a.dataset.p));
+
+// ---------- commands ----------
+async function cmd(c, args = {}, out) {
+  const r = await api("/api/cmd", { cmd: c, args });
+  if (out) { out.textContent = r.msg; out.className = "msg " + (r.ok ? "ok" : "bad"); }
+  else flash(r.msg, r.ok);
+  refresh(); return r;
+}
+function flash(text, ok) { const b = document.createElement("div"); b.className = "banner " + (ok ? "" : "amber"); b.style.cssText = ok ? "background:rgba(68,224,138,.08);border:1px solid rgba(68,224,138,.35);color:#c8f5da" : ""; b.textContent = text;
+  $("banners").prepend(b); setTimeout(() => b.remove(), 5000); }
+function confirmBox(title, html, yesText, danger = true) {
+  return new Promise(res => { $("dlg-t").textContent = title; $("dlg-b").innerHTML = html; $("dlg-yes").textContent = yesText; $("dlg-yes").className = "btn " + (danger ? "danger" : "go");
+    $("dlg-yes").onclick = () => { $("dlg").close(); res(true); }; $("dlg-no").onclick = () => { $("dlg").close(); res(false); }; $("dlg").showModal(); });
+}
+document.addEventListener("click", async e => {
+  const el = e.target.closest("[data-cmd],[data-confirm],[data-go],[data-set],[data-cancel]"); if (!el) return;
+  if (el.dataset.go) return go(el.dataset.go);
+  if (el.dataset.cancel) return cmd("schedule_cancel", { id: el.dataset.cancel });
+  if (el.dataset.set) return setSetting({ [el.dataset.set]: !el.classList.contains("on") });
+  if (el.dataset.confirm === "pc_off_now") { if (await confirmBox("Turn the PC off?", "<p>Windows shuts down after a 30-second countdown; you can cancel it. Salad stops earning, and the PC can't be turned back on remotely.</p>", "⏻ Turn off")) cmd("pc_off_now"); return; }
+  cmd(el.dataset.cmd);
+});
+async function setSetting(o, out) { const r = await api("/api/cmd", { cmd: "settings_set", args: o }); if (out) { out.textContent = r.msg; out.className = "msg ok"; } refresh(); }
+document.querySelectorAll("[data-num]").forEach(i => i.addEventListener("change", () => setSetting({ [i.dataset.num]: Number(i.value) })));
+document.querySelectorAll("[data-text]").forEach(i => i.addEventListener("change", () => setSetting({ [i.dataset.text]: i.value })));
+$("sf-sensor").onclick = e => { if (e.target.dataset.v) setSetting({ safetySensor: e.target.dataset.v }); };
+
+// ---------- render ----------
+async function refresh() {
+  try { S = await api("/api/state"); } catch { return; }
+  // the watchdog updated itself: reload so the page matches the new version
+  if (window.__ver && S.version && S.version !== window.__ver) { location.reload(); return; }
+  window.__ver = S.version;
+  const t = S.telemetry, g = t.gpu, s = t.salad, st = S.settings;
+  // banners (lockout, old watchdog, sensors)
+  const b = [];
+  if (S.lockout) b.push(`<div class="banner red"><b>⚠ Salad locked out at ${Math.round(S.lockout.tempC)} °C · ${fmtT(S.lockout.at)}</b>The GPU ${esc(S.lockout.sensor)} reached the safety limit, so Salad was force-closed and kept closed. Check the fans, dust and airflow before allowing it again.<br><button class="btn" id="clear-lock">I checked the PC (fans, dust, airflow), allow Salad again</button></div>`);
+  if (S.oldWatchdog) b.push(`<div class="banner amber"><b>The old GPU Watchdog is running</b>Two watchdogs would fight over Salad. Close the old one from its tray icon (right-click → Exit). Game Mode waits until then.</div>`);
+  if (t.safety.sensorFail) b.push(`<div class="banner amber"><b>GPU temperature can't be read</b>The safety stop won't act on missing data.</div>`);
+  if (!st.relayUrl) b.push(`<div class="banner amber"><b>Website not set up yet</b>Everything works on this PC; the website connection is added during setup.</div>`);
+  const keep = [...$("banners").children].filter(x => !x.dataset.fixed);
+  $("banners").innerHTML = b.map(x => x.replace('<div class="banner', '<div data-fixed="1" class="banner')).join(""); keep.forEach(k => $("banners").prepend(k));
+  if ($("clear-lock")) $("clear-lock").onclick = clearLockout;
+
+  const strip = `<span class="pill"><span class="dot ${S.relay.connected ? "on" : ""}"></span>${S.relay.connected ? `Website connected · ${S.relay.viewers} watching` : "Website not connected"}</span>
+    <span class="pill ${s.state === "chopping" ? "salad" : s.state === "locked_out" ? "bad" : ""}">● Salad ${esc(LABEL[s.state] || s.state).toLowerCase()}${s.hold && s.state !== "locked_out" ? " · hold" : ""}</span>
+    <span class="pill">🎮 ${!s.gameMode.enabled ? "Game Mode off" : s.gameMode.activeGame ? "Paused for " + esc(s.gameMode.activeGame) : "Waiting for a game"}</span>
+    <span class="pill">${S.password.synced ? '<span style="color:var(--green)">✔</span> Password synced' : "⏳ Password pending sync"}</span>`;
+  $("strip").innerHTML = strip; $("strip2").innerHTML = strip; $("strip3").innerHTML = strip;
+
+  renderMonitor(S);
+
+  $("o-hold").textContent = s.state === "locked_out" ? "locked out" : s.hold ? "hold active" : "no hold";
+  $("clear-hold").classList.toggle("hidden", !s.hold || s.state === "locked_out");
+  document.querySelectorAll('[data-cmd="salad_chop_now"]').forEach(x => x.disabled = s.state === "locked_out");
+  $("o-gm").textContent = `Pauses for games, Chop Now ${st.gameResumeDelaySec} s after the last one closes`;
+  document.querySelectorAll("[data-set]").forEach(x => x.classList.toggle("on", !!st[x.dataset.set]));
+  document.querySelectorAll("[data-num]").forEach(x => { if (document.activeElement !== x) x.value = st[x.dataset.num]; });
+  document.querySelectorAll("[data-text]").forEach(x => { if (document.activeElement !== x) x.value = st[x.dataset.text] || ""; });
+  $("sf-sensor").querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.v === st.safetySensor));
+  $("sf-core-now").textContent = isNum(g.coreC) ? `now ${Math.round(g.coreC)} °C` : "now N/A";
+  $("sf-hot-now").textContent = isNum(g.hotspotC) ? `now ${Math.round(g.hotspotC)} °C` : "N/A on this card";
+  $("lock-pill").innerHTML = S.lockout ? '<span class="dot" style="background:var(--red)"></span>Lockout: ACTIVE' : '<span class="dot on"></span>Lockout: not active';
+  $("cancel-sd").disabled = !t.shutdown.pendingAt;
+  $("datadir").textContent = "Data: " + st.dataFolder; $("dataloc").textContent = st.dataFolder;
+  $("pw-sync").innerHTML = S.password.synced ? '<span style="color:var(--green)">✔ synced to website</span>' : "⏳ pending sync";
+  $("tz").textContent = "PC time zone: " + t.pc.tz;
+  $("g-active").textContent = S.games.active.length ? S.games.active.join(", ") : "no game";
+
+  const sched = t.schedules.map(x => `<div class="li"><span>${x.action === "pc_off" ? "Turn PC off" : "Close Salad"} · ${fmtT(x.at)}${x.missed ? ' <span class="tag run">missed</span>' : ""}</span><button class="chip" data-cancel="${esc(x.id)}">✕</button></div>`).join("");
+  $("o-sched").innerHTML = sched || `<div style="color:var(--dim);font-size:12.5px">None</div>`;
+  $("s-list").innerHTML = sched || `<div style="color:var(--dim);font-size:12.5px">Nothing scheduled.</div>`;
+
+  // lights countdown ring
+  const left = S.lights.screenOffAt ? Math.max(0, S.lights.screenOffAt - Math.floor(Date.now() / 1000)) : 0;
+  $("ring").style.background = left ? `conic-gradient(var(--violet) 0 ${100 - left / st.screenOffDelaySec * 100}%, rgba(255,255,255,.08) 0)` : "rgba(255,255,255,.06)";
+  $("ring-n").textContent = left ? left : "☾";
+  $("lights-text").innerHTML = left ? `${esc(S.lights.last)}<br>Screen turns off in <b>${left} s</b><br><span style="color:var(--dim);font-size:11.5px">PC stays awake — not sleep</span>`
+    : `Turns SignalRGB lighting off now, then the monitors after ${st.screenOffDelaySec} s. The PC stays awake (not sleep).`;
+
+  // recent log
+  if (page === "monitor" || page === "controls") { const l = await api("/api/log"); $("o-log").innerHTML = l.events.slice(0, 6).map(row).join(""); $("m-log").innerHTML = l.events.slice(0, 5).map(row).join(""); }
+  $("g-extra").innerHTML = S.games.extra.map(n => `<div class="li"><span>${esc(n)}.exe <small>added by you</small></span><button class="chip" data-rm="${esc(n)}">✕</button></div>`).join("")
+    + S.games.folders.map(n => `<div class="li"><span>${esc(n)} <small>folder</small></span><button class="chip" data-rmf="${esc(n)}">✕</button></div>`).join("");
+}
+const row = e => `<div class="log-row"><span class="tm num">${new Date(e.t * 1000).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span><span class="lv ${e.level}">${e.level === "error" ? "ERR" : e.level}</span><span>${esc(e.msg)}</span></div>`;
+
+async function clearLockout() {
+  const temps = await api("/api/temps");
+  const pts = temps.filter(x => isFinite(x[1]));
+  let svg = "";
+  if (pts.length > 1) {
+    const min = Math.min(...pts.map(p => p[1])) - 2, max = Math.max(...pts.map(p => p[1])) + 2, t0 = pts[0][0], t1 = pts.at(-1)[0] || t0 + 1;
+    const d = pts.map((p, i) => (i ? "L" : "M") + ((p[0] - t0) / (t1 - t0) * 480).toFixed(1) + " " + (110 - (p[1] - min) / (max - min) * 100).toFixed(1)).join("");
+    svg = `<svg viewBox="0 0 480 120" style="width:100%;height:120px;background:rgba(0,0,0,.25);border-radius:10px"><path d="${d}" fill="none" stroke="#ff4d5e" stroke-width="2"/></svg>
+      <p style="font-size:12px">GPU core temperature in the minutes before the stop: ${Math.round(Math.min(...pts.map(p => p[1])))}–${Math.round(Math.max(...pts.map(p => p[1])))} °C.</p>`;
+  }
+  if (await confirmBox("Allow Salad again?", `<p>Only do this after checking the fans, dust and airflow. Salad stays on hold until you press Start chopping.</p>${svg}`, "Yes, I checked it", false)) cmd("lockout_clear");
+}
+
+// ---------- monitor ----------
+const H = { gpu: [], cpu: [], ram: [], ssd: [] };
+function push(arr, v) { arr.push(v); if (arr.length > 300) arr.shift(); }
+function spark(el, data, color, h = 36) {
+  const pts = data.filter(isNum); if (pts.length < 2) { el.innerHTML = ""; return; }
+  const w = 300, min = Math.min(...pts) - 1, max = Math.max(...pts) + 1;
+  const xy = data.map((v, i) => isNum(v) ? [i / (data.length - 1) * w, h - ((v - min) / (max - min)) * (h - 4) - 2] : null).filter(Boolean);
+  const d = xy.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join("");
+  el.innerHTML = `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="height:${h}px"><defs><linearGradient id="g${el.id}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".3"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs><path d="${d} L${xy.at(-1)[0]} ${h} L${xy[0][0]} ${h} Z" fill="url(#g${el.id})"/><path d="${d}" fill="none" stroke="${color}" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>`;
+}
+const col = c => !isNum(c) ? "#5b6676" : c < 45 ? "#3fd6ff" : c < 72 ? "#44e08a" : c < 83 ? "#ffb547" : "#ff4d5e";
+const W = v => isNum(v) ? `<span class="bolt">⚡</span>${Math.round(v)}<small> W</small>` : `<span class="na">N/A</span>`;
+let lastT = 0;
+let hero = null;
+try { hero = new GWHero.Hero($("hero-canvas"), "/img/", () => false, () => "card"); hero.cutout = true; hero.load().catch(() => {}); } catch (e) { hero = null; }
+function renderMonitor(S) {
+  const t = S.telemetry, g = t.gpu, s = t.salad, f = g.fans?.[0];
+  if (hero) hero.set({ rpm: (g.fans || []).map(x => isNum(x.rpm) ? x.rpm : isNum(x.pct) ? x.pct * 30 : 0), tempC: g.tempC, online: true });
+  if (t.t !== lastT) { lastT = t.t; push(H.gpu, g.tempC); push(H.cpu, t.cpu.tempC); push(H.ram, Math.max(...t.ram.map(r => r.tempC ?? -99))); push(H.ssd, Math.max(...t.ssd.map(r => r.tempC ?? -99))); }
+  $("m-gpuname").textContent = (g.name || "GPU").replace("NVIDIA GeForce ", "") + " · GPU temperature";
+  $("m-gpu").innerHTML = isNum(g.tempC) ? `${Math.round(g.tempC)}<sup>°C</sup>` : "N/A"; $("m-gpu").className = "mbig num " + tc(g.tempC);
+  $("m-core").innerHTML = `<span class="${tc(g.coreC)}">${deg(g.coreC)}</span>`;
+  $("m-hot").innerHTML = `<span class="${tc(g.hotspotC)}">${deg(g.hotspotC)}</span>`;
+  $("m-util").innerHTML = isNum(g.util) ? `${g.util}<small>%</small>` : "N/A";
+  $("m-pow").innerHTML = W(g.powerW);
+  $("m-fan").innerHTML = f && isNum(f.pct) ? `${f.pct}<small>%${isNum(f.rpm) ? " · " + Math.round(f.rpm).toLocaleString() + " rpm" : ""}</small>` : "N/A";
+  $("m-vram").innerHTML = isNum(g.vramUsedMB) ? `${(g.vramUsedMB / 1024).toFixed(1)}<small> / ${Math.round(g.vramTotalMB / 1024)} GB</small>` : "N/A";
+  $("m-vram-bar").style.width = isNum(g.vramUsedMB) ? (g.vramUsedMB / g.vramTotalMB * 100) + "%" : "0";
+  $("m-hot-note").textContent = isNum(g.hotspotC) ? "" : "Hotspot: start HWiNFO (with Shared Memory Support) or GPU-Z and it appears here automatically.";
+  $("m-limit").textContent = `Safety limit ${t.safety.limitC} °C (${t.safety.sensor})${t.safety.enabled ? "" : " · OFF"}`;
+  $("m-salad").textContent = (LABEL[s.state] || s.state) + (s.hold && s.state !== "locked_out" ? " · hold" : ""); $("m-salad").className = "state " + s.state;
+  const e = s.earnings;
+  $("m-bal").textContent = e && isNum(e.balanceUSD) ? "$" + e.balanceUSD.toFixed(4) : "N/A";
+  const pmin = e && e.lastPayoutAt ? Math.max(0, Math.round((Date.now() / 1000 - e.lastPayoutAt) / 60)) : null;
+  $("m-pay").innerHTML = e && isNum(e.lastPayoutUSD) ? `+$${e.lastPayoutUSD.toFixed(4)} <span style="color:var(--dim);font-weight:400;font-size:12.5px">· ${pmin < 1 ? "just now" : pmin < 60 ? pmin + " min ago" : Math.floor(pmin / 60) + " h " + (pmin % 60) + " min ago"}</span>` : "N/A";
+  $("m-24").textContent = e && isNum(e.last24hUSD) ? (e.last24hUSD >= 0 ? "+" : "−") + "$" + Math.abs(e.last24hUSD).toFixed(4) : "N/A";
+  const ago = e && e.updatedAt ? Math.round((Date.now() / 1000 - e.updatedAt) / 60) : null;
+  $("m-earn-upd").textContent = ago == null ? "" : ago < 1 ? "updated just now" : `updated ${ago} min ago`;
+  $("m-earn-note").textContent = S.earningsStatus && S.earningsStatus !== "OK" ? S.earningsStatus + (e ? " Showing the last values read." : "") : e && !isNum(e.lastPayoutUSD) ? "Last payout appears the next time Salad adds to your balance." : "";
+  $("m-cpuname").textContent = t.cpu.name || "";
+  $("m-cpu").innerHTML = `<span class="${tc(t.cpu.tempC, "cpu")}">${deg(t.cpu.tempC)}</span>`;
+  $("m-cpupow").innerHTML = W(t.cpu.powerW);
+  const pair = (list, kind, fallback) => (list.length ? list : fallback).slice(0, 2).map(r => `<div><div class="lbl">${esc(r.name)}</div><div class="mv ${tc(r.tempC, kind)}">${deg(r.tempC)}</div></div>`).join("");
+  $("m-ram").innerHTML = pair(t.ram, "ram", [{ name: "DIMM 1" }, { name: "DIMM 2" }]);
+  $("m-ssd").innerHTML = pair(t.ssd, "ssd", [{ name: "SSD 1" }, { name: "SSD 2" }]);
+  const next = t.schedules.filter(x => !x.missed)[0];
+  $("m-status").innerHTML = [
+    ["Website", S.relay.connected ? `connected · ${S.relay.viewers} watching` : "not connected"],
+    ["Game Mode", !s.gameMode.enabled ? "off" : s.gameMode.activeGame ? "paused for " + esc(s.gameMode.activeGame) : "waiting for a game"],
+    ["Safety stop", S.lockout ? '<b style="color:var(--red)">LOCKED OUT</b>' : t.safety.enabled ? `on · ${t.safety.limitC} °C` : '<span style="color:var(--amber)">off</span>'],
+    ["Next schedule", next ? (next.action === "pc_off" ? "PC off · " : "Close Salad · ") + fmtT(next.at) : "none"],
+    ["Shutdown", t.shutdown.pendingAt ? `<b style="color:var(--red)">in ${Math.max(0, t.shutdown.pendingAt - Math.floor(Date.now() / 1000))} s</b>` : "none pending"],
+  ].map(([k, v]) => `<div><span>${k}</span><span>${v}</span></div>`).join("");
+}
+
+// ---------- games page ----------
+let LIB = [];
+async function loadLibrary() { LIB = await api("/api/library"); drawLib(); const progs = await api("/api/programs");
+  $("g-running").innerHTML = `<option value="">Add from running programs…</option>` + progs.map(p => `<option>${esc(p)}</option>`).join(""); }
+function drawLib() { const q = $("g-filter").value.toLowerCase(); const act = S ? S.games.active : [];
+  const rows = LIB.filter(x => !q || x.name.toLowerCase().includes(q));
+  $("g-count").textContent = `${LIB.length} found`;
+  $("g-list").innerHTML = rows.map(x => `<div class="li"><span>${esc(x.name)} ${act.includes(x.name) ? '<span class="tag run">running</span>' : ""}</span><small>${esc(x.source)}</small></div>`).join("") || `<div style="color:var(--dim)">Nothing found.</div>`; }
+$("g-filter").oninput = drawLib;
+$("g-add").onclick = async () => { await cmd("game_add", { name: $("g-name").value }, $("g-msg")); $("g-name").value = ""; loadLibrary(); };
+$("g-running").onchange = async e => { if (!e.target.value) return; await cmd("game_add", { name: e.target.value }, $("g-msg")); loadLibrary(); };
+$("g-refresh").onclick = async () => { await cmd("games_rescan", {}, $("g-msg")); loadLibrary(); };
+$("g-addfolder").onclick = async () => { await cmd("folder_add", { path: $("g-folder").value }, $("g-msg")); $("g-folder").value = ""; loadLibrary(); };
+$("g-extra").onclick = async e => { const b = e.target.closest("[data-rm],[data-rmf]"); if (!b) return;
+  if (b.dataset.rm) await cmd("game_remove", { name: b.dataset.rm }, $("g-msg")); else await cmd("folder_remove", { path: b.dataset.rmf }, $("g-msg")); loadLibrary(); };
+
+// ---------- schedules page ----------
+let sAction = "pc_off", sMode = "at";
+const sHelp = () => { $("s-help").textContent = (sMode === "at" ? `Next ${$("s-time").value || "07:00"} on this PC.` : `In ${$("s-min").value} minutes.`) + (sAction === "pc_off" ? " Once the PC is off it can't be turned back on remotely." : ""); };
+$("s-action").onclick = e => { if (!e.target.dataset.v) return; sAction = e.target.dataset.v; $("s-action").querySelectorAll("button").forEach(b => b.classList.toggle("on", b === e.target)); sHelp(); };
+$("s-mode").onclick = e => { if (!e.target.dataset.v) return; sMode = e.target.dataset.v; $("s-mode").querySelectorAll("button").forEach(b => b.classList.toggle("on", b === e.target)); $("s-at").classList.toggle("hidden", sMode !== "at"); $("s-in").classList.toggle("hidden", sMode !== "in"); sHelp(); };
+$("s-time").oninput = sHelp; $("s-min").oninput = sHelp;
+$("s-go").onclick = () => cmd("schedule_add", sMode === "at" ? { action: sAction, atLocal: $("s-time").value || "07:00" } : { action: sAction, inMinutes: Number($("s-min").value) }, $("s-msg"));
+
+// ---------- password ----------
+const pwStr = p => { if (!p) return 0; let c = [/[a-z]/, /[A-Z]/, /\d/, /[^a-zA-Z\d]/].filter(r => r.test(p)).length; let s = p.length >= 14 ? 3 : p.length >= 10 ? 2 : p.length >= 8 ? 1 : 0; if (c >= 3) s++; return Math.max(p.length >= 6 ? 1 : 0, Math.min(4, s)); };
+$("pw1").oninput = () => { const n = pwStr($("pw1").value), col = ["", "#ff4d5e", "#ffb547", "#44e08a", "#3fd6ff"][n];
+  $("pw-str").querySelectorAll("i").forEach((x, i) => x.style.background = i < n ? col : "");
+  $("pw-hint").textContent = !$("pw1").value ? "Longer is safer. 6 digits can be guessed by a determined attacker." : /^\d+$/.test($("pw1").value) && $("pw1").value.length < 10 ? "Weak: a short number. Longer is safer." : ["Too short", "Weak", "OK", "Good", "Strong"][n]; };
+$("pw-save").onclick = async () => { if ($("pw1").value !== $("pw2").value) { $("pw-msg").textContent = "The two passwords don't match."; $("pw-msg").className = "msg bad"; return; }
+  await cmd("password_set", { password: $("pw1").value }, $("pw-msg")); $("pw1").value = $("pw2").value = ""; $("pw1").oninput(); };
+
+// ---------- log page ----------
+let LOG = [], logMore = false, lf = "all";
+async function loadLog(reset) { const before = reset || !LOG.length ? "" : LOG.at(-1).t; const r = await api("/api/log" + (before ? "?before=" + before : ""));
+  LOG = reset ? r.events : LOG.concat(r.events); logMore = r.more; drawLog(); }
+function drawLog() { const q = $("l-q").value.toLowerCase(); const rows = LOG.filter(e => (lf === "all" || e.level === lf) && (!q || e.msg.toLowerCase().includes(q)));
+  $("l-list").innerHTML = rows.map(row).join("") || `<div style="color:var(--dim)">Nothing matches.</div>`; $("l-more").classList.toggle("hidden", !logMore); }
+$("l-q").oninput = drawLog; $("l-more").onclick = () => loadLog(false);
+$("l-f").onclick = e => { if (!e.target.dataset.v) return; lf = e.target.dataset.v; $("l-f").querySelectorAll("button").forEach(b => b.classList.toggle("on", b === e.target)); drawLog(); };
+
+refresh(); setInterval(refresh, 1000);
+</script>
+</body>
+</html>

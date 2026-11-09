@@ -1,0 +1,16 @@
+# secrets and local state: never on GitHub
+config/
+logs/
+*.lnk
+GPU_WATCHDOG_BUILD_GUIDE.md
+*BUILD_GUIDE*.md
+.dev.vars
+# private originals (the Salad screenshot shows your balance)
+assets/originals/
+# build output and downloads
+node_modules/
+dist/
+.wrangler/
+tools/*.zip
+agent/GPU-Watchdog-Agent.exe
+agent/lib/

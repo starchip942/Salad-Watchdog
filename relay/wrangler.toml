@@ -1,0 +1,19 @@
+name = "gpu-watchdog-relay"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[vars]
+# The website's address. Set during setup (e.g. https://yourname.github.io)
+ALLOWED_ORIGIN = "http://localhost:5173"
+
+[[durable_objects.bindings]]
+name = "HUB"
+class_name = "Hub"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Hub"]
+
+# Secrets (never in this file): AGENT_KEY, SESSION_SIGNING_KEY
+#   npx wrangler secret put AGENT_KEY
