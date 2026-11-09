@@ -1,7 +1,7 @@
 import "./style.css";
 import { Hero } from "./hero";
 import { layoutCore } from "./core";
-import { DEMO, Live, Session, command, login, olderEvents } from "./net";
+import { DEMO, NO_RELAY, Live, Session, command, login, olderEvents } from "./net";
 import type { HistPoint, LogEvent, Num, Telemetry } from "./types";
 import { ago, esc, isNum, logTime, pcTime, range3, tempClass, tempColor, usd4 } from "./format";
 
@@ -170,6 +170,8 @@ function renderStatus() { /* status pills removed: the banners say when the PC i
 
 function renderBanners() {
   const t = S.t, out: string[] = [];
+  if (DEMO) out.push(`<div class="banner red"><b>DEMO DATA — not your PC</b>This address ends with ?demo. Open the normal link to see your PC.</div>`);
+  if (NO_RELAY) out.push(`<div class="banner red"><b>Not connected to your PC</b>This copy of the website doesn't know your PC's relay address. Open https://starchip942.github.io/Salad-Watchdog/</div>`);
   const lo = t?.safety?.lockout;
   if (lo) out.push(`<div class="banner red"><b>⚠ Salad locked out at ${Math.round(lo.tempC)} °C · ${pcTime(lo.at, tz(), true)}</b>Check cooling (fans, dust, airflow). Clear it on the PC.</div>`);
   if (t?.safety?.sensorFail) out.push(`<div class="banner amber"><b>GPU temperature can't be read</b>The safety stop won't act on missing data. Check the PC.</div>`);

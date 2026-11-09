@@ -1,7 +1,9 @@
 import type { HistPoint, LogEvent, Telemetry } from "./types";
 
 export const RELAY: string = (import.meta.env.VITE_RELAY_URL as string | undefined)?.replace(/\/$/, "") ?? "";
-export const DEMO = !RELAY || new URLSearchParams(location.search).has("demo");
+// Demo data only when asked for explicitly (?demo), never by accident
+export const DEMO = new URLSearchParams(location.search).has("demo");
+export const NO_RELAY = !RELAY && !DEMO;
 
 export interface Handlers {
   hello(m: { online: boolean; lastSeen: number; last: Telemetry | null; history: HistPoint[]; events: LogEvent[]; eventsTotal: number }): void;
@@ -22,6 +24,7 @@ export class Live {
 
   start() {
     if (DEMO) { startDemo(this.h); return; }
+    if (NO_RELAY) { this.h.link("closed"); return; }   // this copy of the site doesn't know the PC's address
     this.connect();
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible" && (!this.ws || this.ws.readyState > 1)) this.connect();
