@@ -396,13 +396,15 @@ namespace GpuWatchdog
                         IntPtr h; lock (Gate) h = parked;
                         if (h == IntPtr.Zero) { lastFg = GetForegroundWindow(); continue; }
                         if (!IsWindow(h)) { lock (Gate) parked = IntPtr.Zero; continue; }
-                        if (!IsWindowVisible(h)) { Release(); continue; }          // Salad hid it to the tray itself
+                        if (!IsWindowVisible(h)) { Release(); Log.Debug("Salad hid its window itself."); continue; }          // Salad hid it to the tray itself
                         var fgNow = GetForegroundWindow();
                         bool becameFg = fgNow == h && lastFg != h;
                         // you opened Salad yourself: clicked its tray icon, or started Salad again from a shortcut
-                        bool userOpened = becameFg && (DateTime.Now - parkedAt).TotalSeconds > 3 && MouseOnTaskbar();
+                        // you opened Salad yourself: it came to the front right after a mouse click / key press of yours
+                        bool userOpened = becameFg && (DateTime.Now - parkedAt).TotalSeconds > 3 && (Native.UserActiveWithinMs(2500) || MouseOnTaskbar());
                         if (userOpened) { Release(); Log.Debug("Salad opened by you; window shown normally."); continue; }
-                        if (fgNow == h) GiveFocusBack(lastFg != h && lastFg != IntPtr.Zero ? lastFg : IntPtr.Zero);   // never keep the invisible window in front
+                        // never keep the invisible window in front, but never take focus away while you're using the PC
+                        if (fgNow == h && !Native.UserActiveWithinMs(2500)) GiveFocusBack(lastFg != h && lastFg != IntPtr.Zero ? lastFg : IntPtr.Zero);
                         else lastFg = fgNow;
                     }
                     catch { }

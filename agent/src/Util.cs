@@ -155,8 +155,9 @@ namespace GpuWatchdog
                     {
                         if (before.Contains(h)) continue;
                         // you clicked the tray icon / a shortcut yourself: leave that window alone and stop guarding
-                        if (SaladPeek.MouseOnTaskbar()) return;
+                        if (SaladPeek.MouseOnTaskbar() || Native.UserActiveWithinMs(2500)) return;
                         ShowWindow(h, 0);   // SW_HIDE: back to the tray
+                        Log.Debug("Hid a " + string.Join("/", processNames) + " window that popped up by itself while starting.");
                     }
                 }
             });
@@ -189,6 +190,8 @@ namespace GpuWatchdog
 
         [StructLayout(LayoutKind.Sequential)] struct LASTINPUTINFO { public uint cbSize; public uint dwTime; }
         [DllImport("user32.dll")] static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
+        /// <summary>Did you move the mouse / click / type in the last `ms` milliseconds?</summary>
+        public static bool UserActiveWithinMs(int ms) => unchecked((uint)Environment.TickCount - LastInputTick()) < (uint)ms;
         public static uint LastInputTick() { var i = new LASTINPUTINFO { cbSize = 8 }; return GetLastInputInfo(ref i) ? i.dwTime : 0; }
     }
 }
