@@ -14,3 +14,4 @@ dist/
 tools/*.zip
 agent/GPU-Watchdog-Agent.exe
 agent/lib/
+tools/.upload-temp/
