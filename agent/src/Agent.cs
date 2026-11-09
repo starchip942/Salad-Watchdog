@@ -282,7 +282,8 @@ namespace GpuWatchdog
             lock (ActionGate)
             {
                 Hold = false; PausedByUs = false; PausedForGame = false; SaveState();
-                if (!Salad.AnyRunning())
+                // the Salad app itself must be running (its background service alone may come back by itself, but doesn't chop)
+                if (!Salad.AppRunning())
                 {
                     msg = Salad.Launch();
                     // the service needs about half a minute to sign in, and a Start sent before that may be lost
