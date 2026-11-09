@@ -32,6 +32,8 @@ namespace GpuWatchdog
 
         // game mode
         public bool GameModeEnabled = true;
+        public string AfterburnerProfile1Name = "Undervolt", AfterburnerProfile2Name = "Stock";
+        public int AfterburnerLastProfile;
         public int GameResumeDelaySec = 10;
         public List<string> GameProcesses = new List<string>();      // extra programs that count as games, by name
         public List<string> GameFolders = new List<string>();        // extra folders whose programs count as games

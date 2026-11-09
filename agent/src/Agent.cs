@@ -529,6 +529,7 @@ namespace GpuWatchdog
                 case "salad_chop_now": return ChopNow(w);
                 case "salad_pause": return Pause(w + ":", true);
                 case "salad_off_now": return CloseSalad(w);
+                case "afterburner_profile": { var r = Afterburner.Apply((int)(Json.Num(args, "profile") ?? 0), w); SendTelemetry(); return r; }
                 case "schedule_add": return AddSchedule(args, w);
                 case "schedule_cancel": return CancelSchedule(Json.Str(args, "id"), w);
             }
@@ -670,6 +671,7 @@ namespace GpuWatchdog
                     { "limitC", s.SafetySensor == "hotspot" ? s.SafetyHotspotLimitC : s.SafetyCoreLimitC }, { "hotspotLimitC", s.SafetyHotspotLimitC },
                     { "sensor", s.SafetySensor }, { "enabled", s.SafetyEnabled }, { "sensorFail", SensorFail },
                     { "lockout", Lock.Active ? new Dictionary<string, object> { { "at", Lock.At }, { "tempC", Lock.TempC }, { "sensor", Lock.Sensor } } : null } } },
+                { "afterburner", Afterburner.Info() },
                 { "shutdown", new Dictionary<string, object> { { "pendingAt", ShutdownAt > 0 ? (object)ShutdownAt : null } } },
                 { "schedules", sched.Select(x => new Dictionary<string, object> { { "id", x.Id }, { "action", x.Action }, { "at", x.At }, { "missed", x.Missed } }).ToList() },
             };

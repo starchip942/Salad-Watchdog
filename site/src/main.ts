@@ -145,6 +145,13 @@ function render() {
   (document.querySelector('[data-cmd="salad_chop_now"]') as HTMLButtonElement).disabled = s.state === "locked_out";
 
   renderSchedules();
+  const ab = t.afterburner;
+  document.querySelectorAll<HTMLButtonElement>("[data-ab]").forEach(b => {
+    const n = Number(b.dataset.ab);
+    b.hidden = !ab?.available;
+    b.textContent = "GPU: " + (ab?.names?.[n - 1] ?? (n === 1 ? "Undervolt" : "Stock"));
+    b.classList.toggle("on", ab?.profile === n);
+  });
 
   hero.set({ rpm: (g.fans ?? []).map(f => isNum(f.rpm) ? f.rpm : isNum(f.pct) ? f.pct * 30 : 0), tempC: g.tempC, online: S.online });
 }
@@ -266,8 +273,9 @@ async function run(cmd: string, args: Record<string, unknown> = {}) {
 }
 
 document.addEventListener("click", e => {
-  const el = (e.target as HTMLElement).closest<HTMLElement>("[data-cmd],[data-cancel],#log-more");
+  const el = (e.target as HTMLElement).closest<HTMLElement>("[data-cmd],[data-cancel],[data-ab],#log-more");
   if (!el) return;
+  if (el.dataset.ab) { run("afterburner_profile", { profile: Number(el.dataset.ab) }); return; }
   if (el.id === "log-more") { openLogSheet(); return; }
   if (el.dataset.cancel) { run("schedule_cancel", { id: el.dataset.cancel }); return; }
   const cmd = el.dataset.cmd!;

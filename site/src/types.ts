@@ -24,6 +24,7 @@ export interface Telemetry {
   };
   safety?: { limitC: number; sensor: "core" | "hotspot" | "either"; hotspotLimitC?: number; sensorFail?: boolean;
              lockout: null | { at: number; tempC: number; sensor: string } };
+  afterburner?: { available: boolean; profile: number | null; names: string[] };
   shutdown?: { pendingAt: number | null };
   schedules: Schedule[];
 }

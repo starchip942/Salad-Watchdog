@@ -127,6 +127,7 @@ function startDemo(h: Handlers) {
     salad: { state: "chopping", hold: false, gameMode: { activeGame: null },
       earnings: { balanceUSD: 3.4731, estNextHourLowUSD: 0.1177, estNextHourHighUSD: 0.2486, last24hUSD: 3.0407, updatedAt: now - 60, lastPayoutUSD: 0.0213, lastPayoutAt: now - 600, nextHourAt: now - 240 } },
     safety: { limitC: 85, sensor: "core", lockout: null },
+    afterburner: { available: true, profile: 1, names: ["Undervolt", "Stock"] },
     shutdown: { pendingAt: null },
     schedules: [],
   };
@@ -175,6 +176,7 @@ function demoCommand(cmd: string, args: Record<string, unknown>) {
       if (args.atLocal) { const [hh, mm] = String(args.atLocal).split(":").map(Number); const d = new Date(); d.setHours(hh, mm, 0, 0); if (d.getTime() < Date.now()) d.setDate(d.getDate() + 1); at = Math.floor(d.getTime() / 1000); }
       demoT.schedules.push({ id: "s" + Math.random().toString(36).slice(2, 7), action: args.action as "pc_off", at }); msg = "Scheduled."; break;
     }
+    case "afterburner_profile": demoT.afterburner = { ...demoT.afterburner!, profile: Number(args.profile) }; msg = (Number(args.profile) === 1 ? "Undervolt" : "Stock") + " applied."; break;
     case "schedule_cancel": demoT.schedules = demoT.schedules.filter(x => x.id !== args.id); msg = "Schedule cancelled."; break;
   }
   ev(`Website: ${msg}`);

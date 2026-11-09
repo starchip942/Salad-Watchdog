@@ -257,6 +257,10 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
             <div class="set"><div>Hotspot limit<div class="d num" id="sf-hot-now"></div></div><div><input class="inp n num" data-num="safetyHotspotLimitC"> °C</div></div>
             <div class="set"><div>Trigger after<div class="d">ignores single glitchy readings</div></div><div><input class="inp n num" data-num="safetySamples"> readings in a row</div></div>
           </div>
+          <div class="glass c"><h3>GPU profile <span>MSI Afterburner</span></h3>
+            <div class="row2" id="ab-btns"><button class="btn" data-ab="1">Undervolt</button><button class="btn" data-ab="2">Stock</button></div>
+            <div class="msg" id="ab-msg"></div>
+          </div>
           <div class="glass c"><h3>Lights &amp; Screen</h3>
             <div class="set"><div>Screen-off delay</div><div><input class="inp n num" data-num="screenOffDelaySec"> s</div></div>
             <div class="set"><div>Turn the screen off even if the lights fail</div><button class="tog" data-set="screenOffEvenIfLightsFail"></button></div>
@@ -355,6 +359,7 @@ document.querySelectorAll("[data-num]").forEach(i => i.addEventListener(inSafety
 document.querySelectorAll("[data-text]").forEach(i => i.addEventListener("input", () => { P[i.dataset.text] = i.value; renderSettings(); }));
 $("sf-sensor").onclick = e => { if (e.target.dataset.v) { P.safetySensor = e.target.dataset.v; renderSettings(); } };
 $("sv-save").onclick = async () => { if (!Object.keys(P).length) return; const o = P; P = {}; await setSetting(o); flash("Settings saved.", true); };
+$("ab-btns").onclick = e => { const b = e.target.closest("[data-ab]"); if (b) cmd("afterburner_profile", { profile: Number(b.dataset.ab) }, $("ab-msg")); };
 $("sv-undo").onclick = () => { P = {}; renderSettings(); };
 function renderSettings() {
   if (!S) return; const st = S.settings, n = Object.keys(P).length;
@@ -385,6 +390,9 @@ async function refresh() {
   if ($("clear-lock")) $("clear-lock").onclick = clearLockout;
 
   renderMonitor(S);
+  const ab = t.afterburner || {};
+  document.querySelectorAll("[data-ab]").forEach(b => { b.disabled = !ab.available; b.textContent = (ab.names || [])[b.dataset.ab - 1] || b.textContent; b.classList.toggle("go", ab.profile == b.dataset.ab); });
+  if (!ab.available) $("ab-msg").textContent = "MSI Afterburner isn't installed on this PC.";
 
   $("o-hold").textContent = s.state === "locked_out" ? "locked out" : s.hold ? "hold active" : "no hold";
   $("clear-hold").classList.toggle("hidden", !s.hold || s.state === "locked_out");
