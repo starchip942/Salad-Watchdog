@@ -295,7 +295,7 @@ namespace GpuWatchdog
                     WindowGuard.HideNew(8, "Salad");
                     Salad.Call(Salad.StartMethod);
                     Log.Info($"Salad: start chopping ({who.ToLowerInvariant()}).");
-                    chopUntil = 0;
+                    chopUntil = 0; chopVerifyUntil = Time.Now + 600; chopNextTry = Time.Now + 60;
                     msg = "Salad has started chopping.";
                 }
                 catch (Exception e)
@@ -309,8 +309,14 @@ namespace GpuWatchdog
             return (true, msg);
         }
 
+        long chopVerifyUntil, lastGameKill;
         void ChopRetry(long now)
         {
+            if (chopVerifyUntil > 0 && chopUntil == 0)
+            {
+                if (Lock.Active || Hold || ActiveGames.Count > 0 || distroRunning || now > chopVerifyUntil) chopVerifyUntil = 0;   // running, or give up after 10 min
+                else if (now >= chopNextTry) { chopUntil = now + 1; chopNextTry = now; }   // resend Start below
+            }
             if (chopUntil == 0 || now < chopNextTry) return;
             if (Lock.Active || Hold) { chopUntil = 0; return; }
             lock (ActionGate)
@@ -320,11 +326,18 @@ namespace GpuWatchdog
                     WindowGuard.HideNew(8, "Salad");
                     Salad.Call(Salad.StartMethod);
                     Log.Debug("Salad accepted Start.");
-                    chopUntil = 0; PausedByUs = false;
+                    PausedByUs = false;
+                    // accepted isn't always acted on (Salad still signing in): check it really starts, else send Start again
+                    if (chopVerifyUntil == 0) chopVerifyUntil = now + 600;
+                    chopUntil = 0; chopNextTry = now + 60;
                 }
                 catch (Exception e)
                 {
-                    if (now >= chopUntil) { Log.Warn("Couldn't start Salad chopping, so it will wait until the PC is idle: " + e.Message); chopUntil = 0; }
+                    if (now >= chopUntil)
+                    {
+                        if (chopVerifyUntil == 0) Log.Warn("Couldn't start Salad chopping (Chop Now): " + e.Message); else Log.Debug("Chop Now not taken yet: " + e.Message);
+                        chopUntil = 0; chopNextTry = now + 20;
+                    }
                     else chopNextTry = now + 10;
                 }
             }
@@ -391,16 +404,22 @@ namespace GpuWatchdog
             {
                 gamesClosedAt = 0;
                 if (Lock.Active) { Log.Debug($"{g.Name} started; Salad is locked out."); continue; }
-                if (SaladState == "chopping" || SaladState == "idle")
+                if (Salad.AnyRunning() || distroRunning)
                 {
-                    var r = Pause($"{g.Name} started", false);
+                    // a game always knocks Salad out completely (app, service and its GPU jobs), at once
+                    string res; lock (ActionGate) { chopUntil = 0; res = Salad.Close(0); }
                     PausedForGame = true; SaveState();
+                    Log.Info($"{g.Name} started: Salad force-closed.");
+                    lastSaladCheck = 0; distroRunning = Salad.DistroRunning(); UpdateSaladState(); SendTelemetry();
                 }
-                else Log.Debug($"{g.Name} started; Salad wasn't chopping.");
+                else Log.Debug($"{g.Name} started; Salad wasn't running.");
             }
-            if (games.Count > 0 && SaladState == "chopping" && PausedForGame && !Lock.Active)
+            // Salad came back while a game is still open (e.g. it restarted itself): close it again
+            if (games.Count > 0 && PausedForGame && !Lock.Active && Salad.AnyRunning() && now - lastGameKill > 15)
             {
-                Pause($"{games[0].Name} still open", false);
+                lastGameKill = now;
+                lock (ActionGate) Salad.Close(0);
+                Log.Debug($"Salad came back while {games[0].Name} is open; closed it again.");
             }
             foreach (var g in before.Where(b => !games.Any(x => x.Name == b.Name)))
                 Log.Debug(games.Count == 0 ? $"{g.Name} closed; waiting {Conf.S.GameResumeDelaySec} s." : $"{g.Name} closed; {games[0].Name} still running.");
@@ -413,7 +432,7 @@ namespace GpuWatchdog
                 if (Lock.Active) { Log.Info("Games closed; Salad stays off (locked out)."); PausedForGame = false; SaveState(); return; }
                 if (Hold) { Log.Info("Games closed; Salad stays paused (you paused it)."); PausedForGame = false; SaveState(); return; }
                 PausedForGame = false;
-                Log.Info("Games closed → Salad chopping again.");
+                Log.Info("Games closed → Salad started in Chop Now.");
                 ChopNow("Games closed");
             }
         }
