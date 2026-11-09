@@ -340,6 +340,13 @@ namespace GpuWatchdog
             var fg = GetForegroundWindow();
             IntPtr found = IntPtr.Zero;
             var watchUntil = DateTime.Now.AddSeconds(14);
+            // No flicker: make Salad's window see-through BEFORE it is shown.
+            // a) windows Salad keeps hidden in the tray are made invisible now, while still hidden
+            foreach (var h in SaladWindows(false, "Chrome_WidgetWin_1")) PreStyle(h);
+            // b) a window Salad creates fresh is caught the moment Windows creates it (before it's shown or painted)
+            var hookThread = new Thread(() => HookNewWindows(watchUntil, () => found != IntPtr.Zero)) { IsBackground = true };
+            hookThread.Start();
+            Thread.Sleep(100);
             // watch for the window from the very first moment, so it's made invisible before it's painted
             var watcher = new Thread(() =>
             {
@@ -370,6 +377,62 @@ namespace GpuWatchdog
                 return found != IntPtr.Zero;
             }
             catch (Exception e) { LastResult = e.Message; return false; }
+            finally
+            {
+                // any window made see-through in advance that didn't become the parked one goes back to normal
+                lock (Gate)
+                    foreach (var kv in preStyled.ToList())
+                        if (kv.Key != parked) { if (IsWindow(kv.Key)) { SetLayeredWindowAttributes(kv.Key, 0, 255, LWA_ALPHA); SetWindowLong(kv.Key, GWL_EXSTYLE, kv.Value); } preStyled.Remove(kv.Key); }
+            }
+        }
+
+        static readonly Dictionary<IntPtr, int> preStyled = new Dictionary<IntPtr, int>();
+        static void PreStyle(IntPtr h)
+        {
+            lock (Gate)
+            {
+                if (preStyled.ContainsKey(h)) return;
+                int ex = GetWindowLong(h, GWL_EXSTYLE);
+                preStyled[h] = ex;
+                SetWindowLong(h, GWL_EXSTYLE, (ex | WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE) & ~WS_EX_APPWINDOW);
+                SetLayeredWindowAttributes(h, 0, 0, LWA_ALPHA);
+            }
+        }
+
+        delegate void WinEventProc(IntPtr hook, uint ev, IntPtr hwnd, int idObject, int idChild, uint thread, uint time);
+        [DllImport("user32.dll")] static extern IntPtr SetWinEventHook(uint min, uint max, IntPtr mod, WinEventProc proc, uint pid, uint tid, uint flags);
+        [DllImport("user32.dll")] static extern bool UnhookWinEvent(IntPtr hook);
+        [DllImport("user32.dll")] static extern bool PeekMessage(out MSG m, IntPtr h, uint min, uint max, uint remove);
+        [DllImport("user32.dll")] static extern bool TranslateMessage(ref MSG m);
+        [DllImport("user32.dll")] static extern IntPtr DispatchMessage(ref MSG m);
+        [StructLayout(LayoutKind.Sequential)] struct MSG { public IntPtr hwnd; public uint message; public IntPtr w, l; public uint time; public int x, y; }
+        static WinEventProc keepAlive;
+        /// <summary>Watches Windows' "window created" events for Salad and makes a new Salad window see-through instantly.</summary>
+        static void HookNewWindows(DateTime until, Func<bool> done)
+        {
+            var pids = Pids();
+            keepAlive = (hook, ev, hwnd, idObject, idChild, thread, time) =>
+            {
+                try
+                {
+                    if (idObject != 0 || idChild != 0 || hwnd == IntPtr.Zero) return;
+                    GetWindowThreadProcessId(hwnd, out uint pid);
+                    if (!pids.Contains(pid) || GetAncestor(hwnd, 2) != hwnd || ClassOf(hwnd) != "Chrome_WidgetWin_1") return;
+                    PreStyle(hwnd);
+                }
+                catch { }
+            };
+            // EVENT_OBJECT_CREATE (0x8000) .. EVENT_OBJECT_SHOW (0x8002), out of context, skip our own process
+            var h = SetWinEventHook(0x8000, 0x8002, IntPtr.Zero, keepAlive, 0, 0, 0x0000 | 0x0002);
+            try
+            {
+                while (DateTime.Now < until && !done())
+                {
+                    while (PeekMessage(out var m, IntPtr.Zero, 0, 0, 1)) { TranslateMessage(ref m); DispatchMessage(ref m); }
+                    Thread.Sleep(2);
+                }
+            }
+            finally { if (h != IntPtr.Zero) UnhookWinEvent(h); }
         }
 
         static void Park(IntPtr h, IntPtr fg)
@@ -377,7 +440,8 @@ namespace GpuWatchdog
             lock (Gate)
             {
                 GetWindowRect(h, out orig);
-                origEx = GetWindowLong(h, GWL_EXSTYLE);
+                origEx = preStyled.TryGetValue(h, out var pre) ? pre : GetWindowLong(h, GWL_EXSTYLE);
+                preStyled.Remove(h);
                 // fully transparent and click-through, but ON screen and on top: Salad only draws (and shares) its page
                 // while Windows reports the window as visible, so it can't be hidden off-screen or behind other windows
                 SetWindowLong(h, GWL_EXSTYLE, (origEx | WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE) & ~WS_EX_APPWINDOW);
