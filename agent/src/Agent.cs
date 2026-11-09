@@ -713,7 +713,7 @@ namespace GpuWatchdog
                     { "name", r.GpuName }, { "tempC", r.GpuTemp }, { "coreC", r.GpuCore }, { "hotspotC", r.GpuHotspot }, { "util", r.GpuUtil },
                     { "vramUsedMB", Rnd(r.VramUsedMB) }, { "vramTotalMB", Rnd(r.VramTotalMB) }, { "powerW", r.GpuPowerW },
                     { "fans", r.Fans.Select(f => new Dictionary<string, object> { { "pct", f.pct }, { "rpm", f.rpm } }).ToList() } } },
-                { "cpu", new Dictionary<string, object> { { "name", r.CpuName }, { "tempC", r.CpuTemp }, { "powerW", r.CpuPowerW } } },
+                { "cpu", new Dictionary<string, object> { { "name", r.CpuName }, { "tempC", r.CpuTemp }, { "powerW", r.CpuPowerW }, { "util", r.CpuLoad } } },
                 { "ram", r.Ram.Select(x => new Dictionary<string, object> { { "name", x.name }, { "tempC", x.tempC } }).ToList() },
                 { "ssd", r.Ssd.Select(x => new Dictionary<string, object> { { "name", x.name }, { "tempC", x.tempC } }).ToList() },
                 { "salad", new Dictionary<string, object> {

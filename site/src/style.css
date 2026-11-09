@@ -203,3 +203,5 @@ footer{color:var(--dim);font-size:11px;text-align:center;line-height:1.7;padding
 }
 @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} .lead{stroke-dashoffset:0} }
 .two{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.two>div{min-width:0}.two .lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.two.three{grid-template-columns:repeat(3,minmax(0,1fr))}

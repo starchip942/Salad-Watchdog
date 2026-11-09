@@ -13,7 +13,7 @@ export interface Telemetry {
   t: number;
   pc?: { tz: string; tzOffsetMin: number; name?: string };
   gpu: { name?: string; tempC: Num; coreC: Num; hotspotC: Num; util: Num; vramUsedMB: Num; vramTotalMB: Num; powerW: Num; fans: Fan[] };
-  cpu: { name?: string; tempC: Num; powerW: Num };
+  cpu: { name?: string; tempC: Num; powerW: Num; util?: Num };
   ram: Temp[];
   ssd: Temp[];
   salad: {

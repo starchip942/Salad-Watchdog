@@ -16,7 +16,7 @@ namespace GpuWatchdog
         public double? GpuTemp, GpuCore, GpuHotspot, GpuUtil, VramUsedMB, VramTotalMB, GpuPowerW;
         public List<FanReading> Fans = new List<FanReading>();
         public string CpuName;
-        public double? CpuTemp, CpuPowerW;
+        public double? CpuTemp, CpuPowerW, CpuLoad;
         public List<TempReading> Ram = new List<TempReading>();
         public List<TempReading> Ssd = new List<TempReading>();
     }
@@ -128,6 +128,8 @@ namespace GpuWatchdog
                         r.CpuTemp = Round(pkg?.Value ?? (temps.Count > 0 ? temps.Where(s => s.Name.StartsWith("Core") || s.Name.StartsWith("CCD")).Select(s => s.Value).DefaultIfEmpty(null).Max() : null));
                         var pw = All(hw).FirstOrDefault(s => s.SensorType == SensorType.Power && s.Value.HasValue && s.Name.Contains("Package"));
                         r.CpuPowerW = Round(pw?.Value, 1);
+                        var load = All(hw).FirstOrDefault(s => s.SensorType == SensorType.Load && s.Value.HasValue && s.Name == "CPU Total");
+                        r.CpuLoad = load?.Value == null ? (double?)null : Math.Round((double)load.Value.Value);
                         break;
                     case HardwareType.Memory:
                         foreach (var dimm in new[] { hw }.Concat(hw.SubHardware))

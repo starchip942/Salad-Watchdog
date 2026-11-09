@@ -121,7 +121,7 @@ function startDemo(h: Handlers) {
   demoT = {
     v: 1, t: now, pc: { tz: "Europe/Istanbul", tzOffsetMin: 180 },
     gpu: { name: "NVIDIA GeForce RTX 5070 Ti", tempC: 66, coreC: 66, hotspotC: null, util: 98, vramUsedMB: 12700, vramTotalMB: 16303, powerW: 248, fans: [{ pct: 58, rpm: 1700 }, { pct: 58, rpm: 1700 }] },
-    cpu: { name: "CPU", tempC: 52, powerW: 46 },
+    cpu: { name: "CPU", tempC: 52, powerW: 46, util: 18 },
     ram: [{ name: "DIMM 1", tempC: 44 }, { name: "DIMM 2", tempC: 45 }],
     ssd: [{ name: "SSD 1", tempC: 41 }, { name: "SSD 2", tempC: 38 }],
     salad: { state: "chopping", hold: false, gameMode: { activeGame: null },

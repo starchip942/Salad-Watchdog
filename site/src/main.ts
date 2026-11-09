@@ -119,6 +119,7 @@ function render() {
   $("cpu-name").textContent = t.cpu.name ?? "";
   const ct = $("cpu-temp"); tween(ct, t.cpu.tempC, deg()); ct.className = "v " + tempClass(t.cpu.tempC, "cpu");
   tween($("cpu-power"), t.cpu.powerW, watts);
+  tween($("cpu-load"), t.cpu.util ?? null, unit("%"));
   renderPair("ram", t.ram, "ram", h => h.r);
   renderPair("ssd", t.ssd, "ssd", h => h.d);
 
