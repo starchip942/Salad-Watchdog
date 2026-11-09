@@ -259,11 +259,13 @@ namespace GpuWatchdog
             if (!GetCursorPos(out var p)) return false;
             var root = GetAncestor(WindowFromPoint(p), 2 /*GA_ROOT*/);
             var c = ClassOf(root);
-            return c == "Shell_TrayWnd" || c == "Shell_SecondaryTrayWnd" || c == "NotifyIconOverflowWindow" || c == "TopLevelWindowForOverflowXamlIsland" || c.StartsWith("Xaml");
+            // taskbar/tray icon, Start menu, or a desktop shortcut
+            return c == "Shell_TrayWnd" || c == "Shell_SecondaryTrayWnd" || c == "NotifyIconOverflowWindow" || c == "TopLevelWindowForOverflowXamlIsland" || c.StartsWith("Xaml")
+                || c == "Windows.UI.Core.CoreWindow" || c == "Progman" || c == "WorkerW";
         }
         static int saladProcs; static DateTime ourLaunchAt;
         [StructLayout(LayoutKind.Sequential)] struct RECT { public int L, T, R, B; }
-        const int GWL_EXSTYLE = -20, WS_EX_LAYERED = 0x80000, WS_EX_TOOLWINDOW = 0x80, WS_EX_APPWINDOW = 0x40000;
+        const int GWL_EXSTYLE = -20, WS_EX_LAYERED = 0x80000, WS_EX_TOOLWINDOW = 0x80, WS_EX_APPWINDOW = 0x40000, WS_EX_TRANSPARENT = 0x20, WS_EX_NOACTIVATE = 0x08000000, WS_EX_TOPMOST = 0x8;
         const uint SWP_NOSIZE = 1, SWP_NOZORDER = 4, SWP_NOACTIVATE = 0x10, LWA_ALPHA = 2;
 
         public static string LastResult = "";
@@ -302,7 +304,7 @@ namespace GpuWatchdog
             {
                 while (DateTime.Now < watchUntil && found == IntPtr.Zero)
                 {
-                    var w = SaladWindows(true);
+                    var w = SaladWindows(true, "Chrome_WidgetWin_1");
                     if (w.Count > 0) { found = w[0]; Park(found, fg); break; }
                     Thread.Sleep(5);
                 }
@@ -311,9 +313,6 @@ namespace GpuWatchdog
             try
             {
                 // 1) open Salad again (as you, through Explorer): a running Salad shows its window
-                ourLaunchAt = DateTime.Now;
-                if (File.Exists(Salad.AppPath)) Process.Start(new ProcessStartInfo("explorer.exe", "\"" + Salad.AppPath + "\"") { UseShellExecute = false });
-                if (watcher.Join(5000) && found != IntPtr.Zero) { LastResult = "opened"; return true; }
                 // 2) the same message Windows sends when you click Salad's tray icon
                 foreach (var host in SaladWindows(false, "Electron_NotifyIconHostWindow"))
                     for (int id = 1; id <= 4 && found == IntPtr.Zero; id++)
@@ -338,9 +337,11 @@ namespace GpuWatchdog
             {
                 GetWindowRect(h, out orig);
                 origEx = GetWindowLong(h, GWL_EXSTYLE);
-                SetWindowLong(h, GWL_EXSTYLE, (origEx | WS_EX_LAYERED | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW);
+                // fully transparent and click-through, but ON screen and on top: Salad only draws (and shares) its page
+                // while Windows reports the window as visible, so it can't be hidden off-screen or behind other windows
+                SetWindowLong(h, GWL_EXSTYLE, (origEx | WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE) & ~WS_EX_APPWINDOW);
                 SetLayeredWindowAttributes(h, 0, 0, LWA_ALPHA);
-                SetWindowPos(h, IntPtr.Zero, -32000, -32000, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+                SetWindowPos(h, new IntPtr(-1) /*HWND_TOPMOST*/, 0, 0, 0, 0, SWP_NOSIZE | 2 /*SWP_NOMOVE*/ | SWP_NOACTIVATE);
                 parkFg = fg;
                 parked = h; parkedAt = DateTime.Now; inputAtPark = Native.LastInputTick();
                 saladProcs = Process.GetProcessesByName("Salad").Length;
@@ -371,7 +372,7 @@ namespace GpuWatchdog
                 if (parked == IntPtr.Zero) return;
                 if (IsWindow(parked))
                 {
-                    SetWindowPos(parked, IntPtr.Zero, orig.L, orig.T, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+                    SetWindowPos(parked, new IntPtr(-2) /*HWND_NOTOPMOST*/, orig.L, orig.T, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
                     SetLayeredWindowAttributes(parked, 0, 255, LWA_ALPHA);
                     SetWindowLong(parked, GWL_EXSTYLE, origEx);
                 }
@@ -397,8 +398,7 @@ namespace GpuWatchdog
                         var fgNow = GetForegroundWindow();
                         bool becameFg = fgNow == h && lastFg != h;
                         // you opened Salad yourself: clicked its tray icon, or started Salad again from a shortcut
-                        bool userOpened = (becameFg && (DateTime.Now - parkedAt).TotalSeconds > 3 && MouseOnTaskbar())
-                            || (Process.GetProcessesByName("Salad").Length > saladProcs && (DateTime.Now - ourLaunchAt).TotalSeconds > 20);
+                        bool userOpened = becameFg && (DateTime.Now - parkedAt).TotalSeconds > 3 && MouseOnTaskbar();
                         if (userOpened) { Release(); Log.Debug("Salad opened by you; window shown normally."); continue; }
                         if (fgNow == h) GiveFocusBack(lastFg != h && lastFg != IntPtr.Zero ? lastFg : IntPtr.Zero);   // never keep the invisible window in front
                         else lastFg = fgNow;
