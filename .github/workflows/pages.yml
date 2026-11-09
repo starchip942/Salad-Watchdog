@@ -1,16 +1,44 @@
-name: Website
+name: Deploy
 on:
   push:
     branches: [main]
-    paths: ["site/**", ".github/workflows/pages.yml"]
   workflow_dispatch:
 permissions:
   contents: read
   pages: write
   id-token: write
-concurrency: { group: pages, cancel-in-progress: true }
+concurrency: { group: deploy, cancel-in-progress: true }
 jobs:
-  build:
+  relay:
+    # Cloudflare relay; runs once the repository has the CLOUDFLARE_API_TOKEN secret and CLOUDFLARE_ACCOUNT_ID variable
+    runs-on: ubuntu-latest
+    outputs:
+      url: ${{ steps.url.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: has
+        run: echo "token=${{ secrets.CLOUDFLARE_API_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v4
+        if: steps.has.outputs.token == 'true'
+        with: { node-version: 22 }
+      - run: npm ci
+        if: steps.has.outputs.token == 'true'
+        working-directory: relay
+      - id: deploy
+        if: steps.has.outputs.token == 'true'
+        working-directory: relay
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy 2>&1 | tee deploy.log
+      - id: url
+        run: |
+          u="${{ vars.RELAY_URL }}"
+          if [ -f relay/deploy.log ]; then f=$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' relay/deploy.log | head -1); [ -n "$f" ] && u="$f"; fi
+          echo "url=$u" >> "$GITHUB_OUTPUT"
+          echo "Relay: $u"
+  site:
+    needs: relay
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,12 +49,12 @@ jobs:
       - run: npm run build
         working-directory: site
         env:
-          VITE_RELAY_URL: ${{ vars.RELAY_URL }}
+          VITE_RELAY_URL: ${{ needs.relay.outputs.url }}
           SITE_BASE: /${{ github.event.repository.name }}/
       - uses: actions/upload-pages-artifact@v3
         with: { path: site/dist }
   deploy:
-    needs: build
+    needs: site
     runs-on: ubuntu-latest
     environment: { name: github-pages, url: "${{ steps.d.outputs.page_url }}" }
     steps:

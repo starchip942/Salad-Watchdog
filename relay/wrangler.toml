@@ -5,7 +5,7 @@ workers_dev = true
 
 [vars]
 # The website's address. Set during setup (e.g. https://yourname.github.io)
-ALLOWED_ORIGIN = "http://localhost:5173"
+ALLOWED_ORIGIN = "https://starchip942.github.io,http://localhost:5173,http://localhost:4173"
 
 [[durable_objects.bindings]]
 name = "HUB"
@@ -15,5 +15,5 @@ class_name = "Hub"
 tag = "v1"
 new_sqlite_classes = ["Hub"]
 
-# Secrets (never in this file): AGENT_KEY, SESSION_SIGNING_KEY
-#   npx wrangler secret put AGENT_KEY
+# No secrets needed: the PC claims the relay on its first connection (only a hash of its key is stored),
+# and the session signing key is generated inside the relay. AGENT_KEY / SESSION_SIGNING_KEY secrets are optional.

@@ -133,8 +133,9 @@ namespace GpuWatchdog
         public string Verify(string id, string cmd, string args, long ts, string nonce, string sig)
         {
             if (string.IsNullOrEmpty(sig) || string.IsNullOrEmpty(nonce)) return "unsigned";
-            var expect = Hmac(Conf.S.AgentKey, string.Join("|", id, cmd, args, ts.ToString(), nonce));
-            if (!FixedEq(expect, sig)) return "bad signature";
+            var msg = string.Join("|", id, cmd, args, ts.ToString(), nonce);
+            // the relay signs with our key, or (when the PC claimed the relay) with the SHA-256 of our key
+            if (!FixedEq(Hmac(Conf.S.AgentKey, msg), sig) && !FixedEq(Hmac(Sha256Hex(Conf.S.AgentKey), msg), sig)) return "bad signature";
             if (Math.Abs(Time.Now - ts) > 30) return "too old";
             lock (nonces)
             {
@@ -149,6 +150,10 @@ namespace GpuWatchdog
         {
             using (var h = new HMACSHA256(Encoding.UTF8.GetBytes(key)))
                 return string.Concat(h.ComputeHash(Encoding.UTF8.GetBytes(msg)).Select(b => b.ToString("x2")));
+        }
+        static string Sha256Hex(string s)
+        {
+            using (var h = SHA256.Create()) return string.Concat(h.ComputeHash(Encoding.UTF8.GetBytes(s)).Select(b => b.ToString("x2")));
         }
         static bool FixedEq(string a, string b)
         {

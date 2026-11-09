@@ -57,8 +57,10 @@ agent.removeAllListeners("message");
 agent.on("message", d => {
   const m = JSON.parse(d);
   if (m.type !== "command") return;
-  const sig = crypto.createHmac("sha256", KEY).update([m.id, m.cmd, m.args, m.ts, m.nonce].join("|")).digest("hex");
-  agent.send(JSON.stringify({ type: "result", id: m.id, ok: sig === m.sig, msg: sig === m.sig ? "done " + m.cmd : "bad sig" }));
+  const data = [m.id, m.cmd, m.args, m.ts, m.nonce].join("|");
+  const keyHash = crypto.createHash("sha256").update(KEY).digest("hex");
+  const ok = [KEY, keyHash].some(k => crypto.createHmac("sha256", k).update(data).digest("hex") === m.sig);
+  agent.send(JSON.stringify({ type: "result", id: m.id, ok, msg: ok ? "done " + m.cmd : "bad sig" }));
 });
 r = await post("/command", { cmd: "salad_pause" }, token); j = await r.json();
 assert(j.ok && j.msg === "done salad_pause", "signed command reaches agent and result comes back");

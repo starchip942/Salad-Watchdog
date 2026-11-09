@@ -14,8 +14,8 @@
 
 export interface Env {
   HUB: DurableObjectNamespace;
-  AGENT_KEY: string;            // secret: long random key shared with the PC only
-  SESSION_SIGNING_KEY: string;  // secret: signs website session tokens
+  AGENT_KEY?: string;           // optional secret; if unset, the first PC to connect claims the relay (its key hash is stored)
+  SESSION_SIGNING_KEY?: string; // optional secret; if unset, a random key is generated and kept in storage
   ALLOWED_ORIGIN: string;       // var: e.g. https://<user>.github.io
 }
 
@@ -92,6 +92,26 @@ export class Hub {
     });
   }
 
+  /** The PC's key: a Cloudflare secret if set, otherwise claimed by the first PC that connects (only its SHA-256 is stored). */
+  async agentKeyOk(key: string): Promise<boolean> {
+    if (key.length < 32) return false;
+    if (this.env.AGENT_KEY) return safeEqual(key, this.env.AGENT_KEY);
+    const h = await sha256hex(key);
+    const stored = (await this.state.storage.get("agentKeyHash")) as string | undefined;
+    if (!stored) { await this.state.storage.put("agentKeyHash", h); return true; }
+    return safeEqual(h, stored);
+  }
+  async agentSecret(): Promise<string> {
+    // commands are signed with the PC's key; in claim mode we use its hash, which the PC can compute too
+    return this.env.AGENT_KEY ? this.env.AGENT_KEY : ((await this.state.storage.get("agentKeyHash")) as string) ?? "";
+  }
+  async signingKey(): Promise<string> {
+    if (this.env.SESSION_SIGNING_KEY) return this.env.SESSION_SIGNING_KEY;
+    let k = (await this.state.storage.get("signingKey")) as string | undefined;
+    if (!k) { const b = new Uint8Array(32); crypto.getRandomValues(b); k = b64u(b); await this.state.storage.put("signingKey", k); }
+    return k;
+  }
+
   agentSocket(): WebSocket | null {
     const s = this.state.getWebSockets("agent");
     return s.length ? s[s.length - 1] : null;
@@ -121,7 +141,7 @@ export class Hub {
     if (req.headers.get("Upgrade") !== "websocket") return json({ error: "websocket only" }, 426);
     const auth = req.headers.get("Authorization") ?? "";
     const key = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-    if (!this.env.AGENT_KEY || !(await safeEqual(key, this.env.AGENT_KEY))) return json({ error: "forbidden" }, 403);
+    if (!(await this.agentKeyOk(key))) return json({ error: "forbidden" }, 403);
     for (const old of this.state.getWebSockets("agent")) { try { old.close(4000, "replaced"); } catch { /* gone */ } }
     const pair = new WebSocketPair();
     this.state.acceptWebSocket(pair[1], ["agent"]);
@@ -287,12 +307,12 @@ export class Hub {
     await this.state.storage.delete(key);
     const epoch = ((await this.state.storage.get("epoch")) as number) ?? 0;
     const exp = Math.floor(now / 1000) + SESSION_TTL_S;
-    const token = await signToken({ exp, epoch }, this.env.SESSION_SIGNING_KEY);
+    const token = await signToken({ exp, epoch }, await this.signingKey());
     return json({ token, exp });
   }
 
   async checkToken(token: string): Promise<boolean> {
-    const p = await readToken(token, this.env.SESSION_SIGNING_KEY);
+    const p = await readToken(token, await this.signingKey());
     if (!p || p.exp < Date.now() / 1000) return false;
     const epoch = ((await this.state.storage.get("epoch")) as number) ?? 0;
     return p.epoch === epoch;
@@ -314,7 +334,7 @@ export class Hub {
     const ts = Math.floor(Date.now() / 1000);
     const nonce = crypto.randomUUID();
     const argsJson = JSON.stringify(args);
-    const sig = await hmacHex(this.env.AGENT_KEY, [id, cmd, argsJson, ts, nonce].join("|"));
+    const sig = await hmacHex(await this.agentSecret(), [id, cmd, argsJson, ts, nonce].join("|"));
     const result = await new Promise<unknown>((resolve) => {
       const timer = setTimeout(() => { this.pending.delete(id); resolve({ ok: false, msg: "The PC didn't answer in time." }); }, COMMAND_TIMEOUT_MS);
       this.pending.set(id, { resolve, timer });
@@ -399,6 +419,9 @@ function constantTimeEq(a: Uint8Array, b: Uint8Array) {
   if (a.length !== b.length) return false;
   let d = 0; for (let i = 0; i < a.length; i++) d |= a[i] ^ b[i];
   return d === 0;
+}
+async function sha256hex(s: string) {
+  return [...new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(s)))].map(b => b.toString(16).padStart(2, "0")).join("");
 }
 async function safeEqual(a: string, b: string) {
   // Hash both first so the comparison time doesn't depend on where they differ, or on length

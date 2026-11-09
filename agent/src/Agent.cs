@@ -408,6 +408,17 @@ namespace GpuWatchdog
         /// <summary>A newer GPU-Watchdog-Agent.exe was put in place: restart into it by ourselves (no prompt needed, we already run as admin).</summary>
         void CheckForUpdate()
         {
+            // relay address written into config\agent.config.json from outside (setup): pick it up without a restart
+            try
+            {
+                var onDisk = Json.Load<Settings>(Conf.FilePath);
+                if (!string.IsNullOrWhiteSpace(onDisk.RelayUrl) && onDisk.RelayUrl != Conf.S.RelayUrl)
+                {
+                    Conf.S.RelayUrl = onDisk.RelayUrl.Trim();
+                    Log.Info("Website relay set to " + Conf.S.RelayUrl + ".");
+                }
+            }
+            catch { }
             if (updateSignalled) return;
             try
             {
