@@ -53,7 +53,7 @@ namespace GpuWatchdog
             Hold = Json.Bool(st, "hold") ?? false;
             PausedForGame = Json.Bool(st, "pausedForGame") ?? false;
             var e0 = Json.Load<EarningsData>(Paths.Cfg("earnings.json"));
-            if (e0.balanceUSD != null) { LastPayoutUSD = e0.lastPayoutUSD; LastPayoutAt = e0.lastPayoutAt; if (e0.nextHourAt > 0) { nhLow = e0.estNextHourLowUSD; nhHigh = e0.estNextHourHighUSD; nhAt = e0.nextHourAt; } Earn = e0; EarnStatus = "Last read " + Time.Short(e0.updatedAt) + "."; }
+            if (e0.balanceUSD != null) { LastPayoutUSD = e0.lastPayoutUSD; LastPayoutAt = e0.lastPayoutAt; if (e0.nextHourAt > 0 && e0.nextHourFrom == "salad" && false) { nhLow = e0.estNextHourLowUSD; nhHigh = e0.estNextHourHighUSD; nhAt = e0.nextHourAt; } Earn = e0; EarnStatus = "Last read " + Time.Short(e0.updatedAt) + "."; }
 
             foreach (var s in Sched.Items.Where(s => !s.Missed && s.At < Time.Now - 60))
             {

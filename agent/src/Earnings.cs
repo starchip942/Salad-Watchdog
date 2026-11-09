@@ -29,14 +29,14 @@ namespace GpuWatchdog
     static class Earnings
     {
         static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
-        const string Money = @"\$\s*(\d+\.\d{2})\s*(\d{1,2})?";
+        const string Money = @"\$\s*(\d+\s*\.\s*\d{2})\s*(\d{1,2})?";   // Salad splits it up: "$ 0 . 06 22" = $0.0622
 
         /// <summary>Parses the Earn tab's visible text. Missing pieces stay null.</summary>
         public static EarningsData Parse(string text)
         {
             var d = new EarningsData();
             var t = Regex.Replace(text ?? "", @"\s+", " ");
-            var m = Regex.Match(t, @"Your Balance\W*" + Money, RegexOptions.IgnoreCase);
+            var m = Regex.Match(t, @"Your Balance(?:\s*Learn more)?\W*" + Money, RegexOptions.IgnoreCase);
             if (m.Success) d.balanceUSD = Val(m.Groups[1].Value, m.Groups[2].Value);
             m = Regex.Match(t, @"Est\.?\s*Next\s*Hour\W*" + Money + @"\s*[~\-–]\s*" + Money, RegexOptions.IgnoreCase);
             if (m.Success) { d.estNextHourLowUSD = Val(m.Groups[1].Value, m.Groups[2].Value); d.estNextHourHighUSD = Val(m.Groups[3].Value, m.Groups[4].Value); }
@@ -51,6 +51,7 @@ namespace GpuWatchdog
 
         static double? Val(string main, string extra)
         {
+            main = Regex.Replace(main ?? "", @"\s+", "");
             if (string.IsNullOrEmpty(extra)) extra = "";
             else if (extra.Length == 1) extra = extra + "0";
             return double.TryParse(main + extra, NumberStyles.Float, Inv, out var v) ? v : (double?)null;

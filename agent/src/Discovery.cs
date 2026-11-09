@@ -277,6 +277,11 @@ namespace GpuWatchdog
             Eq("last 24h 3.04 07", d.last24hUSD, 3.0407);
             Eq("display low (3 decimals)", Math.Round(d.estNextHourLowUSD.Value, 3).ToString("0.000", Time.Inv), "0.118");
             Eq("display high (3 decimals)", Math.Round(d.estNextHourHighUSD.Value, 3).ToString("0.000", Time.Inv), "0.249");
+            var live = Earnings.Parse("Your Balance Learn more $5.0642 Est. Next Hour $ 0 . 06 22 ~ $ 0 . 13 06 Last 24 Hours + $1.6755");
+            Eq("live balance", live.balanceUSD, 5.0642);
+            Eq("live next hour low", live.estNextHourLowUSD, 0.0622);
+            Eq("live next hour high", live.estNextHourHighUSD, 0.1306);
+            Eq("live last 24 h", live.last24hUSD, 1.6755);
             var split = Earnings.Parse("Your Balance\n$3.47\n31\nEst. Next Hour\n$0.11\n77\n~\n$0.24\n86\nLast 24 Hours\n+\n$3.04\n07");
             Eq("separate elements balance", split.balanceUSD, 3.4731);
             Eq("separate elements 24h", split.last24hUSD, 3.0407);
