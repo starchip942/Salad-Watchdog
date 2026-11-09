@@ -131,11 +131,17 @@ namespace GpuWatchdog
             }
             catch (Exception e) { L("MonitorState: " + e.Message); }
 
+            try
+            {
+                var rawS = Salad.MonitorState(4000);
+                try { L("activeWorkloadState values in the stream: " + string.Join(",", Earnings.ActiveWorkloadStates(rawS))); } finally { Array.Clear(rawS, 0, rawS.Length); }
+            }
+            catch (Exception e) { L("activeWorkloadState: " + e.Message); }
             H("Salad app: where Est. Next Hour comes from (app code only)");
             try
             {
                 var code = System.Text.Encoding.ASCII.GetString(File.ReadAllBytes(@"C:\Program Files\Salad\resources\app.asar"));
-                foreach (var word in new[] { "estimatedEarningsPerHour:", "balanceNext24Hours", "startActiveWorkloads", "StartActiveWorkloads", "chopNow", "ChopNow", "setUserIdle", "SetUserIdle", "setUserActive", "autoStart", "AutoStart" })
+                foreach (var word in new[] { "isWorkloadRunning:", "isWorkloadRunning=", "ActiveWorkloadState", "ACTIVE_WORKLOAD_STATE", "activeWorkloadState:" })
                 {
                     int i = code.IndexOf(word), n = 0;
                     while (i >= 0 && n++ < 4)

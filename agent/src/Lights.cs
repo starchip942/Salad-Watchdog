@@ -49,9 +49,13 @@ namespace GpuWatchdog
             }
         }
 
+        static uint offInput;
+        /// <summary>The watchdog turned the screen off and nobody has touched mouse/keyboard since.</summary>
+        public static bool ScreenIsOff => offInput != 0 && Native.LastInputTick() == offInput;
         static void ScreenOff()
         {
             lock (Gate) { ScreenOffAt = 0; timer?.Dispose(); timer = null; }
+            offInput = Native.LastInputTick();
             DisplayOff();
             Log.Debug("Screen off done.");
             // Some monitors wake straight away; send the signal again, but not if the person has moved the mouse since

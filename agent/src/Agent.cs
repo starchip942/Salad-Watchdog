@@ -44,9 +44,39 @@ namespace GpuWatchdog
         public event Action<string, string> Notify;   // (title, text) for the tray balloon
 
         // ---------------- startup ----------------
+        int saladWorkload = -1; long saladWorkloadAt;
+        /// <summary>Asks Salad's service for its workload state every few seconds (read-only, same stream Salad's app uses).</summary>
+        async Task WorkloadLoop()
+        {
+            while (!stopping)
+            {
+                try
+                {
+                    if (Salad.ServiceRunning())
+                    {
+                        var raw = Salad.MonitorState(1500);
+                        try
+                        {
+                            var st = Earnings.ActiveWorkloadStates(raw);
+                            if (st.Count > 0)
+                            {
+                                bool changed = saladWorkload != st[st.Count - 1];
+                                saladWorkload = st[st.Count - 1]; saladWorkloadAt = Time.Now;
+                                if (changed) lastSaladCheck = 0;   // update the shown state right away
+                            }
+                        }
+                        finally { Array.Clear(raw, 0, raw.Length); }   // the stream also carries Salad's login: never kept
+                    }
+                }
+                catch { }
+                await Task.Delay(4000);
+            }
+        }
+
         public void Start()
         {
             I = this;
+            Task.Run(WorkloadLoop);
             Lock = Json.Load<Lockout>(Paths.Cfg("lockout.json"));
             Sched = Json.Load<ScheduleFile>(Paths.Cfg("schedules.json"));
             var st = Json.Load<Dictionary<string, object>>(Paths.Cfg("state.json"));
@@ -247,6 +277,9 @@ namespace GpuWatchdog
             else if (!Salad.AnyRunning()) st = "not_running";
             else if (PausedByUs) st = "paused";
             // chopping = Salad's job VM is up AND the GPU is actually working (stopping a job in Salad leaves the VM running)
+            // Salad's own answer first: activeWorkloadState 2 = a workload is running (what Salad's app shows as "Chop Now")
+            else if (Time.Now - saladWorkloadAt <= 15) st = saladWorkload == 2 ? "chopping" : "idle";
+            // older fallback if Salad's service doesn't answer: job VM up and the GPU working
             else if (distroRunning && GpuBusy()) st = "chopping";
             else st = "idle";
             if (st != SaladState && SaladState != "unknown" && st == "not_running" && !Lock.Active) PausedByUs = false;
@@ -660,9 +693,10 @@ namespace GpuWatchdog
         bool ShouldPeek()
         {
             if (chopUntil > 0 || chopVerifyUntil > 0) return false;   // Salad is (re)starting: don't touch its window now
-            if (SaladPeek.Parked) return (DateTime.Now - lastPeek).TotalMinutes >= 5;   // parked but no number yet: re-check now and then
-            if ((DateTime.Now - lastPeek).TotalMinutes < 10) return false;
-            return ActiveGames.Count == 0 && (SaladState == "chopping" || SaladState == "idle");
+            if (SaladState != "chopping" || ActiveGames.Count > 0) return false;   // not chopping: Salad shows $0.00 anyway, leave it alone
+            if (SaladPeek.Parked) return (DateTime.Now - lastPeek).TotalMinutes >= 5;   // already open invisibly: just read
+            if (Lights.ScreenIsOff) return false;                                       // never open anything while the screen is off
+            return (DateTime.Now - lastPeek).TotalMinutes >= 30;                        // open Salad's window at most every 30 minutes
         }
 
         // ---------------- balance history (for the next-hour estimate) ----------------
