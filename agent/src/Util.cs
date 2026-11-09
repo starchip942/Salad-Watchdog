@@ -151,7 +151,13 @@ namespace GpuWatchdog
                 while (DateTime.Now < until)
                 {
                     System.Threading.Thread.Sleep(300);
-                    foreach (var h in Visible(processNames)) if (!before.Contains(h)) ShowWindow(h, 0);   // SW_HIDE: back to the tray
+                    foreach (var h in Visible(processNames))
+                    {
+                        if (before.Contains(h)) continue;
+                        // you clicked the tray icon / a shortcut yourself: leave that window alone and stop guarding
+                        if (SaladPeek.MouseOnTaskbar()) return;
+                        ShowWindow(h, 0);   // SW_HIDE: back to the tray
+                    }
                 }
             });
         }

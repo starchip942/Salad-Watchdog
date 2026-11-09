@@ -293,7 +293,6 @@ namespace GpuWatchdog
                 }
                 try
                 {
-                    WindowGuard.HideNew(8, "Salad");
                     Salad.Call(Salad.StartMethod);
                     Log.Info($"Salad: start chopping ({who.ToLowerInvariant()}).");
                     chopUntil = 0; chopVerifyUntil = Time.Now + 600; chopNextTry = Time.Now + 60;
@@ -315,7 +314,7 @@ namespace GpuWatchdog
         {
             if (chopVerifyUntil > 0 && chopUntil == 0)
             {
-                if (Lock.Active || Hold || ActiveGames.Count > 0 || distroRunning || now > chopVerifyUntil) chopVerifyUntil = 0;   // running, or give up after 10 min
+                if (Lock.Active || Hold || ActiveGames.Count > 0 || SaladState == "chopping" || now > chopVerifyUntil) chopVerifyUntil = 0;   // really chopping (GPU working), or give up after 10 min
                 else if (now >= chopNextTry) { chopUntil = now + 1; chopNextTry = now; }   // resend Start below
             }
             if (chopUntil == 0 || now < chopNextTry) return;
@@ -324,7 +323,6 @@ namespace GpuWatchdog
             {
                 try
                 {
-                    WindowGuard.HideNew(8, "Salad");
                     Salad.Call(Salad.StartMethod);
                     Log.Debug("Salad accepted Start.");
                     PausedByUs = false;
@@ -655,6 +653,7 @@ namespace GpuWatchdog
         /// <summary>Only while you're away (no mouse/keyboard for 3 min), no game running, Salad chopping, at most every 15 min.</summary>
         bool ShouldPeek()
         {
+            if (chopUntil > 0 || chopVerifyUntil > 0) return false;   // Salad is (re)starting: don't touch its window now
             if (SaladPeek.Parked) return (DateTime.Now - lastPeek).TotalMinutes >= 5;   // parked but no number yet: re-check now and then
             if ((DateTime.Now - lastPeek).TotalMinutes < 10) return false;
             return ActiveGames.Count == 0 && (SaladState == "chopping" || SaladState == "idle");

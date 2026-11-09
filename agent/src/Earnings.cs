@@ -256,7 +256,7 @@ namespace GpuWatchdog
         [StructLayout(LayoutKind.Sequential)] struct POINT { public int X, Y; }
         static string ClassOf(IntPtr h) { var sb = new System.Text.StringBuilder(128); GetClassName(h, sb, 128); return sb.ToString(); }
         /// <summary>Is the mouse over the taskbar / tray (where you'd click Salad's icon)?</summary>
-        static bool MouseOnTaskbar()
+        public static bool MouseOnTaskbar()
         {
             if (!GetCursorPos(out var p)) return false;
             var root = GetAncestor(WindowFromPoint(p), 2 /*GA_ROOT*/);
