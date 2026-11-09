@@ -129,7 +129,7 @@ export class Hero {
       const f = this.meta.fans[i];
       const strength = Math.min(1, this.rpm[i] / 2200);
       if (strength <= 0.02) continue;
-      const rate = 34 * strength;                       // puffs per second per fan
+      const rate = 40 * strength;                       // air streaks per second per fan
       let n = rate * dt; if (Math.random() < n % 1) n = Math.ceil(n); else n = Math.floor(n);
       for (let k = 0; k < n && this.particles.length < cap; k++) {
         // start somewhere on the rotor disc, in that fan's own plane
@@ -139,19 +139,19 @@ export class Hero {
         const th = f.minorAxisDeg * Math.PI / 180;
         let dx = Math.cos(th), dy = Math.sin(th);
         if (dy > 0) { dx = -dx; dy = -dy; }
-        const sp = (260 + 380 * strength) * (0.75 + Math.random() * 0.5);
+        const sp = (700 + 900 * strength) * (0.75 + Math.random() * 0.5);   // pushed air moves fast
         // pushed through the heatsink and out of the back: it starts behind the card and only shows once it clears the card
-        this.particles.push({ x: x + dx * f.size * 0.25, y: y + dy * f.size * 0.25, vx: dx * sp + (Math.random() - .5) * 50, vy: dy * sp + (Math.random() - .5) * 50,
-          age: 0, life: 1.8 + Math.random() * 1.4, size: 90 + Math.random() * 80, spin: Math.random() * 6 });
+        this.particles.push({ x: x + dx * f.size * 0.25, y: y + dy * f.size * 0.25, vx: dx * sp + (Math.random() - .5) * 120, vy: dy * sp + (Math.random() - .5) * 120,
+          age: 0, life: 0.7 + Math.random() * 0.6, size: 14 + Math.random() * 20, spin: Math.random() * 6 });
       }
     }
     const t = performance.now() / 1000;
     for (const p of this.particles) {
       p.age += dt;
-      // soft turbulent drift (cheap curl-ish noise) plus slow rise of warm air
-      p.vx += Math.sin(p.y * 0.004 + t * 1.3 + p.spin) * 30 * dt;
-      p.vy += (Math.cos(p.x * 0.004 + t * 1.1 + p.spin) * 30 - 22) * dt;
-      p.vx *= 1 - 0.35 * dt; p.vy *= 1 - 0.35 * dt;
+      // a jet of air: mostly straight, a little flutter, slowing down as it spreads out
+      p.vx += Math.sin(p.y * 0.006 + t * 3 + p.spin) * 60 * dt;
+      p.vy += Math.cos(p.x * 0.006 + t * 3 + p.spin) * 60 * dt;
+      p.vx *= 1 - 1.2 * dt; p.vy *= 1 - 1.2 * dt;
       p.x += p.vx * dt; p.y += p.vy * dt;
     }
     this.particles = this.particles.filter(p => p.age < p.life);
@@ -206,19 +206,25 @@ export class Hero {
     if (this.particles.length) {
       ctx.save();
       ctx.globalCompositeOperation = "screen";
+      ctx.lineCap = "round";
       const warm = Math.max(0, Math.min(1, (this.glowTemp - 45) / 40));
+      // cool air is a faint blue-white, hot air slightly warmer
+      const rC = Math.round(190 + 60 * warm), gC = Math.round(215 + 10 * warm), bC = Math.round(255 - 70 * warm);
       for (const p of this.particles) {
         const u = p.age / p.life;
-        // fades in after leaving the fan face, swells as it spreads, fades as it goes
-        const alpha = Math.sin(Math.min(1, u * 4) * Math.PI / 2) * (1 - u) * 0.3;
-        const s = p.size * (0.7 + u * 1.6);
-        ctx.globalAlpha = alpha;
-        ctx.filter = "none";
-        ctx.drawImage(this.puff, p.x - s / 2, p.y - s / 2, s, s);
-        if (warm > 0.05) {
-          ctx.globalAlpha = alpha * warm * 0.9;
-          ctx.drawImage(this.puffWarm(), p.x - s / 2, p.y - s / 2, s, s);
-        }
+        // thin streaks along the direction of travel: fade in, then thin out and vanish
+        const alpha = Math.sin(Math.min(1, u * 5) * Math.PI / 2) * (1 - u) * 0.10;
+        const len = 0.16;                                   // streak length = distance covered in 160 ms
+        const x0 = p.x - p.vx * len, y0 = p.y - p.vy * len;
+        const g = ctx.createLinearGradient(x0, y0, p.x, p.y);
+        g.addColorStop(0, `rgba(${rC},${gC},${bC},0)`);
+        g.addColorStop(1, `rgba(${rC},${gC},${bC},${alpha.toFixed(3)})`);
+        ctx.strokeStyle = g;
+        // a soft wide stroke plus a thinner core: reads as moving air, not rain
+        ctx.lineWidth = p.size * (1 + u * 2);
+        ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(p.x, p.y); ctx.stroke();
+        ctx.lineWidth = p.size * 0.35 * (1 + u);
+        ctx.stroke();
       }
       ctx.restore();
     }
