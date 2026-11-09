@@ -25,6 +25,9 @@ export class Hero {
   rpm = [0, 0, 0];             // smoothed (inertia)
   angle = [0, 0.7, 1.9];
   particles: P[] = [];
+  flow = [0, 0.33, 0.66];          // how far each fan's air has scrolled (texture px)
+  flowTex?: HTMLCanvasElement;
+  flowBuf?: HTMLCanvasElement;
   puff!: HTMLCanvasElement;
   last = 0;
   running = false;
@@ -117,8 +120,8 @@ export class Hero {
     }
     const tgt = this.input.tempC ?? 40;
     this.glowTemp += (tgt - this.glowTemp) * (1 - Math.exp(-dt / 2));
-    if (!reduced) this.stepAir(dt);
-    else this.particles.length = 0;
+    this.particles.length = 0;
+    for (let i = 0; i < 3; i++) this.flow[i] += dt * (250 + 900 * Math.min(1, this.rpm[i] / 2200));
     return !moving;
   }
 
@@ -155,6 +158,78 @@ export class Hero {
       p.x += p.vx * dt; p.y += p.vy * dt;
     }
     this.particles = this.particles.filter(p => p.age < p.life);
+  }
+
+  /** A tileable texture of soft, long airflow streaks (flowing along +x). Made once. */
+  makeFlowTex(): HTMLCanvasElement {
+    const W = 512, H = 160;
+    const raw = document.createElement("canvas"); raw.width = W; raw.height = H;
+    const c = raw.getContext("2d")!;
+    c.lineCap = "round";
+    for (let k = 0; k < 170; k++) {
+      const y = 6 + Math.random() * (H - 12), x = Math.random() * W, len = 90 + Math.random() * 320;
+      c.strokeStyle = `rgba(215,232,255,${(0.05 + Math.random() * 0.2).toFixed(3)})`;
+      c.lineWidth = 1 + Math.random() * 5;
+      for (const dx of [0, -W]) {           // wrap around so the texture tiles seamlessly
+        c.beginPath(); c.moveTo(x + dx, y); c.bezierCurveTo(x + dx + len * 0.33, y + (Math.random() - .5) * 6, x + dx + len * 0.66, y + (Math.random() - .5) * 6, x + dx + len, y); c.stroke();
+      }
+    }
+    const out = document.createElement("canvas"); out.width = W; out.height = H;
+    const o = out.getContext("2d")!;
+    o.filter = "blur(3px)";
+    o.drawImage(raw, 0, 0); o.drawImage(raw, W, 0); o.drawImage(raw, -W, 0);
+    return out;
+  }
+
+  /** Each fan pushes a widening, continuously flowing stream of air out behind the card. */
+  drawStreams() {
+    const ctx = this.ctx;
+    const tex = this.flowTex ??= this.makeFlowTex();
+    const buf = this.flowBuf ??= Object.assign(document.createElement("canvas"), { width: 512, height: 256 });
+    const b = buf.getContext("2d")!;
+    const warm = Math.max(0, Math.min(1, (this.glowTemp - 45) / 40));
+    for (let i = 0; i < 3; i++) {
+      const strength = Math.min(1, this.rpm[i] / 2200);
+      if (strength < 0.02) continue;
+      const f = this.meta.fans[i];
+      const th = f.minorAxisDeg * Math.PI / 180;
+      let dx = Math.cos(th), dy = Math.sin(th);
+      if (dy > 0) { dx = -dx; dy = -dy; }
+      const D = f.size * Math.hypot(f.affine[0], f.affine[3]);   // fan diameter in photo pixels
+      const L = D * (2.4 + strength), w1 = D * 1.7, w0 = D * 0.85;
+      const BW = buf.width, BH = buf.height;
+      // 1) the flowing texture inside a cone that widens as the air spreads
+      b.globalCompositeOperation = "source-over";
+      b.clearRect(0, 0, BW, BH);
+      b.save();
+      b.beginPath();
+      const h0 = (w0 / w1) * BH;
+      b.moveTo(0, (BH - h0) / 2); b.lineTo(BW, 0); b.lineTo(BW, BH); b.lineTo(0, (BH + h0) / 2); b.closePath();
+      b.clip();
+      const off = (this.flow[i] * 2) % tex.width, off2 = (this.flow[i] * 1.3 + 200) % tex.width;
+      b.globalAlpha = 1;   b.drawImage(tex, off - tex.width, 0, tex.width, BH); b.drawImage(tex, off, 0, tex.width, BH);
+      b.globalAlpha = 0.6; b.drawImage(tex, off2 - tex.width, 30, tex.width, BH - 60); b.drawImage(tex, off2, 30, tex.width, BH - 60);
+      b.restore();
+      // warm air gets a faint warm tint
+      if (warm > 0.05) { b.globalCompositeOperation = "source-atop"; b.fillStyle = `rgba(255,170,90,${(0.35 * warm).toFixed(3)})`; b.fillRect(0, 0, BW, BH); }
+      // 2) soft edges: fade in right behind the card, fade out as it goes, soft sides
+      b.globalCompositeOperation = "destination-in";
+      const gx = b.createLinearGradient(0, 0, BW, 0);
+      gx.addColorStop(0, "rgba(0,0,0,0)"); gx.addColorStop(0.18, "rgba(0,0,0,1)"); gx.addColorStop(0.55, "rgba(0,0,0,.75)"); gx.addColorStop(1, "rgba(0,0,0,0)");
+      b.fillStyle = gx; b.fillRect(0, 0, BW, BH);
+      const gy = b.createLinearGradient(0, 0, 0, BH);
+      gy.addColorStop(0, "rgba(0,0,0,0)"); gy.addColorStop(0.3, "rgba(0,0,0,1)"); gy.addColorStop(0.7, "rgba(0,0,0,1)"); gy.addColorStop(1, "rgba(0,0,0,0)");
+      b.fillStyle = gy; b.fillRect(0, 0, BW, BH);
+      b.globalCompositeOperation = "source-over";
+      // 3) onto the picture, starting behind the fan and pointing out of the back of the card
+      ctx.save();
+      ctx.translate(f.center[0], f.center[1]);
+      ctx.rotate(Math.atan2(dy, dx));
+      ctx.globalCompositeOperation = "screen";
+      ctx.globalAlpha = 0.18 + 0.42 * strength;
+      ctx.drawImage(buf, D * 0.1, -w1 / 2, L, w1);
+      ctx.restore();
+    }
   }
 
   draw(_dt: number) {
@@ -202,35 +277,12 @@ export class Hero {
       ctx.restore();
     }
 
-    // air
-    if (this.particles.length) {
-      ctx.save();
-      ctx.globalCompositeOperation = "screen";
-      ctx.lineCap = "round";
-      const warm = Math.max(0, Math.min(1, (this.glowTemp - 45) / 40));
-      // cool air is a faint blue-white, hot air slightly warmer
-      const rC = Math.round(190 + 60 * warm), gC = Math.round(215 + 10 * warm), bC = Math.round(255 - 70 * warm);
-      for (const p of this.particles) {
-        const u = p.age / p.life;
-        // thin streaks along the direction of travel: fade in, then thin out and vanish
-        const alpha = Math.sin(Math.min(1, u * 5) * Math.PI / 2) * (1 - u) * 0.10;
-        const len = 0.16;                                   // streak length = distance covered in 160 ms
-        const x0 = p.x - p.vx * len, y0 = p.y - p.vy * len;
-        const g = ctx.createLinearGradient(x0, y0, p.x, p.y);
-        g.addColorStop(0, `rgba(${rC},${gC},${bC},0)`);
-        g.addColorStop(1, `rgba(${rC},${gC},${bC},${alpha.toFixed(3)})`);
-        ctx.strokeStyle = g;
-        // a soft wide stroke plus a thinner core: reads as moving air, not rain
-        ctx.lineWidth = p.size * (1 + u * 2);
-        ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(p.x, p.y); ctx.stroke();
-        ctx.lineWidth = p.size * 0.35 * (1 + u);
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
+    // air: a continuous stream blown out of the back of the card by each fan
+    const streaming = !this.reduced.matches && this.rpm.some(r => r > 40);
+    if (streaming) this.drawStreams();
 
     // the card itself goes back on top, so the air only shows where it comes out behind the card
-    if ((this.particles.length || this.cutout) && this.meta.card) {
+    if ((streaming || this.cutout) && this.meta.card) {
       ctx.save();
       if (this.cutout && !this.input.online) ctx.globalAlpha = 0.5;
       ctx.beginPath();
