@@ -156,7 +156,7 @@ namespace GpuWatchdog
                         try { SaladPeek.Release(); } catch { }
                         string res = Salad.Close(0);
                         Log.Warn("Halted from the panel: " + res + " Watchdog closed.");
-                        System.Threading.Tasks.Task.Run(async () => { await System.Threading.Tasks.Task.Delay(1500); Program.ExitApp?.Invoke(); });
+                        System.Threading.Tasks.Task.Run(async () => { await System.Threading.Tasks.Task.Delay(1500); ClosePanelWindows(); Program.ExitApp?.Invoke(); });
                         return (true, res + " The watchdog is closing.");
                     }
                 case "open_folder": Process.Start("explorer.exe", "\"" + Paths.Root + "\""); return (true, "Opened.");
@@ -238,6 +238,23 @@ namespace GpuWatchdog
             if (vr != s.ViewRequiresPassword) Agent.I.Relay.Send(new Dictionary<string, object> { { "type", "info" }, { "viewRequiresPassword", s.ViewRequiresPassword } });
             Agent.I.SendTelemetry();
             return (true, "Saved.");
+        }
+
+        /// <summary>Closes the panel's own browser window (only the one using the watchdog's private profile in config\edge-panel).</summary>
+        public static void ClosePanelWindows()
+        {
+            try
+            {
+                var profile = Paths.Cfg("edge-panel");
+                using (var q = new System.Management.ManagementObjectSearcher("SELECT ProcessId, CommandLine FROM Win32_Process WHERE Name='msedge.exe' OR Name='brave.exe' OR Name='chrome.exe'"))
+                    foreach (System.Management.ManagementObject o in q.Get())
+                    {
+                        var cl = o["CommandLine"] as string;
+                        if (cl == null || cl.IndexOf(profile, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                        try { Process.GetProcessById(Convert.ToInt32(o["ProcessId"])).Kill(); } catch { }
+                    }
+            }
+            catch (Exception e) { Log.Debug("Couldn't close the panel window: " + e.Message); }
         }
 
         // ---------------- the window ----------------

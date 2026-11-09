@@ -103,6 +103,7 @@ namespace GpuWatchdog
 
             agent.Stop();
             panel.Stop();
+            if (!restarting && !SessionEnd.Ended) Panel.ClosePanelWindows();   // closing the watchdog closes its panel window too
             if (!SessionEnd.Ended) { if (restarting) Log.Debug("Watchdog closed for the update."); else Log.Info("Watchdog closed."); }
             mutex.ReleaseMutex();
             return 0;
