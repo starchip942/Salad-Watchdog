@@ -137,11 +137,10 @@ function render() {
   if (e) {
     $("e-bal").textContent = usd4(e.balanceUSD);
     const nhAge = e.nextHourAt ? Date.now() / 1000 - e.nextHourAt : null;
-    $("e-next").innerHTML = isNum(e.estNextHourHighUSD) ? `${range3(e.estNextHourLowUSD, e.estNextHourHighUSD)} <small>· ${nhAge != null ? ago(nhAge) : ""}</small>` : `<small>read while you're away from the PC</small>`;
+    $("e-next").innerHTML = isNum(e.estNextHourHighUSD) ? `${range3(e.estNextHourLowUSD, e.estNextHourHighUSD)} <small>· ${nhAge != null ? ago(nhAge) : ""}</small>` : "—";
     $("e-pay").innerHTML = isNum(e.lastPayoutUSD ?? null) ? `+$${e.lastPayoutUSD!.toFixed(4)} <small>· ${e.lastPayoutAt ? ago(Date.now() / 1000 - e.lastPayoutAt) : ""}</small>` : "N/A";
     const l24 = $("e-24"); l24.textContent = usd4(e.last24hUSD, true); l24.style.color = isNum(e.last24hUSD) ? "var(--green)" : "";
-    $("salad-updated").textContent = e.updatedAt ? "updated " + ago(Date.now() / 1000 - e.updatedAt) : "earnings not read yet";
-  } else $("salad-updated").textContent = "";
+  }
   (document.querySelector('[data-cmd="salad_chop_now"]') as HTMLButtonElement).disabled = s.state === "locked_out";
 
   renderSchedules();
@@ -251,7 +250,7 @@ function renderLock() {
   const unlocked = !!Session.token() || (DEMO && Session.exp() * 1000 > Date.now());
   $("controls").classList.toggle("unlocked", unlocked);
   const left = Math.max(0, Math.round((Session.exp() * 1000 - Date.now()) / 60000));
-  $("lock-state").innerHTML = unlocked ? `<span style="color:var(--green)">🔓 unlocked · ${left} min left</span>` : "🔒 password required";
+  $("lock-state").innerHTML = unlocked ? `<span style="color:var(--green)">${left} min left</span>` : "";
 }
 $("lockbar").addEventListener("submit", async e => {
   e.preventDefault();
@@ -288,7 +287,7 @@ document.addEventListener("click", e => {
 
 function confirmPcOff() {
   if (!$("controls").classList.contains("unlocked")) { msg("Enter the password first.", false); return; }
-  openSheet("Turn the PC off?", `<p class="help">Windows shuts down after a 30-second countdown. You can cancel it during the countdown.<br><b>Salad stops earning, and the PC can't be turned back on from this website.</b></p>
+  openSheet("Turn the PC off?", `<p class="help">Shuts down in 30 s. It can't be turned back on from here.</p>
     <div class="ctrls" style="grid-template-columns:1fr 1fr"><button class="btn" data-cmd="close">Keep it on</button><button class="btn danger" data-cmd="confirm_pc_off">⏻ Turn off</button></div>`);
 }
 
@@ -306,8 +305,7 @@ function openSchedule() {
     <button class="btn go" id="sched-go" style="width:100%">Schedule</button>`);
   const help = () => {
     const tzName = tz() ?? "the PC's time zone";
-    $("sched-help").innerHTML = (mode === "at" ? `Next time it's <b>${esc($<HTMLInputElement>("at").value || "07:00")}</b> on the PC (${esc(tzName)}).` : `In ${esc($<HTMLInputElement>("in").value)} minutes.`)
-      + (action === "pc_off" ? "<br>Once the PC is off, it can't be turned back on from here." : "");
+    $("sched-help").innerHTML = mode === "at" ? `PC time (${esc(tzName)})` : "";
   };
   const body = $("sheet-body");
   body.addEventListener("click", e => {
@@ -353,5 +351,5 @@ new Live({
 setInterval(() => { renderStatus(); renderBanners(); renderLock(); }, 1000);
 renderLock();
 renderLog();
-$("foot").innerHTML = DEMO ? "Demo data: no relay configured yet." : "";
+$("foot").innerHTML = "";
 window.addEventListener("resize", () => renderLog());

@@ -209,11 +209,11 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
     <!-- SALAD & GAMES -->
     <section data-page="games" class="stack hidden" style="gap:16px">
       <div class="h1"><h1>Salad &amp; Games</h1></div>
-      <div class="glass c"><h3>Games <span>Salad closes when a game starts and chops again after the last one closes</span></h3>
+      <div class="glass c"><h3>Games </h3>
         <div class="set"><div>Now running</div><div id="g-active" style="color:var(--amber)">no game</div></div>
         <div class="set"><div>Chop again after the last game closes</div><div><input class="inp n num" data-num="gameResumeDelaySec"> s</div></div>
-        <div class="set"><div>Import Steam games<div class="d">every Steam library</div></div><button class="tog" data-set="importSteam"></button></div>
-        <div class="set"><div>Import game folders<div class="d">D:\Games, X:\XboxGames, Epic, GOG on every drive</div></div><button class="tog" data-set="importGameFolders"></button></div>
+        <div class="set"><div>Import Steam games</div><button class="tog" data-set="importSteam"></button></div>
+        <div class="set"><div>Import game folders</div><button class="tog" data-set="importGameFolders"></button></div>
       </div>
       <details class="glass c fold" id="g-fold"><summary><h3>Games that pause Salad <span id="g-count"></span></h3></summary>
         <div class="fold-body">
@@ -241,7 +241,7 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
           <button class="btn go" id="s-go">Schedule</button>
           <div class="msg" id="s-msg" style="margin-top:8px"></div>
         </div>
-        <div class="glass c"><h3>Scheduled <span>stored on this PC · survive restarts</span></h3><div class="stack" id="s-list"></div></div>
+        <div class="glass c"><h3>Scheduled </h3><div class="stack" id="s-list"></div></div>
       </div>
     </section>
 
@@ -250,21 +250,21 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
       <div class="h1"><h1>Safety &amp; Settings</h1><div style="display:flex;gap:10px;align-items:center"><span class="msg" id="sv-msg"></span><button class="btn small" id="sv-undo">Discard</button><button class="btn go small" id="sv-save" style="min-width:110px">Save</button></div></div>
       <div class="g g2" style="align-items:start">
         <div class="stack" style="gap:16px">
-          <div class="glass c" style="border-color:rgba(255,77,94,.25)"><h3>Emergency auto-kill <span>works even with the internet down</span></h3>
-            <div class="set"><div>Enabled<div class="d">Force-closes Salad and locks it out until you clear it here</div></div><button class="tog" data-set="safetyEnabled"></button></div>
+          <div class="glass c" style="border-color:rgba(255,77,94,.25)"><h3>Emergency auto-kill </h3>
+            <div class="set"><div>Enabled</div><button class="tog" data-set="safetyEnabled"></button></div>
             <div class="set"><div>Watch sensor</div><div class="seg" id="sf-sensor"><button data-v="core">Core</button><button data-v="hotspot">Hotspot</button><button data-v="either">Either</button></div></div>
             <div class="set"><div>Core limit<div class="d num" id="sf-core-now"></div></div><div><input class="inp n num" data-num="safetyCoreLimitC"> °C</div></div>
             <div class="set"><div>Hotspot limit<div class="d num" id="sf-hot-now"></div></div><div><input class="inp n num" data-num="safetyHotspotLimitC"> °C</div></div>
-            <div class="set"><div>Trigger after<div class="d">ignores single glitchy readings</div></div><div><input class="inp n num" data-num="safetySamples"> readings in a row</div></div>
+            <div class="set"><div>Trigger after</div><div><input class="inp n num" data-num="safetySamples"> readings in a row</div></div>
           </div>
-          <div class="glass c"><h3>GPU profile <span>MSI Afterburner</span></h3>
+          <div class="glass c"><h3>GPU profile </h3>
             <div class="row2" id="ab-btns"><button class="btn" data-ab="1">Undervolt</button><button class="btn" data-ab="2">Stock</button></div>
             <div class="msg" id="ab-msg"></div>
           </div>
           <div class="glass c"><h3>Lights &amp; Screen</h3>
             <div class="set"><div>Screen-off delay</div><div><input class="inp n num" data-num="screenOffDelaySec"> s</div></div>
             <div class="set"><div>Turn the screen off even if the lights fail</div><button class="tog" data-set="screenOffEvenIfLightsFail"></button></div>
-            <div class="set"><div>Lights back on<div class="d">SignalRGB lighting</div></div><button class="btn small" data-cmd="lights_on">Turn lights on</button></div>
+            <div class="set"><div>Lights back on</div><button class="btn small" data-cmd="lights_on">Turn lights on</button></div>
           </div>
         </div>
         <div class="stack" style="gap:16px">
@@ -280,10 +280,10 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
             <div class="msg" id="pw-msg"></div>
           </div></details>
           <div class="glass c"><h3>General</h3>
-            <div class="set"><div>Show earnings on the website<div class="d">anyone with the link can see them</div></div><button class="tog" data-set="showEarningsOnWebsite"></button></div>
-            <div class="set"><div>Website viewing needs the password<div class="d">off: anyone with the link sees the stats</div></div><button class="tog" data-set="viewRequiresPassword"></button></div>
+            <div class="set"><div>Show earnings on the website</div><button class="tog" data-set="showEarningsOnWebsite"></button></div>
+            <div class="set"><div>Website viewing needs the password</div><button class="tog" data-set="viewRequiresPassword"></button></div>
             <div class="set"><div>Start hidden in the tray</div><button class="tog" data-set="startHiddenInTray"></button></div>
-            <div class="set"><div>Update every … s when nobody is watching<div class="d">every second while someone is</div></div><div><input class="inp n num" data-num="sampleSecondsIdle"> s</div></div>
+            <div class="set"><div>Update interval when nobody is watching</div><div><input class="inp n num" data-num="sampleSecondsIdle"> s</div></div>
             <div class="set"><div>Relay address</div><input class="inp" data-text="relayUrl" style="width:280px" placeholder="https://…workers.dev"></div>
             <div class="set"><div>Data location<div class="d" id="dataloc"></div></div><button class="btn small" data-cmd="open_folder">Open folder</button></div>
           </div>
