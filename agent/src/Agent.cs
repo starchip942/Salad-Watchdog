@@ -576,18 +576,22 @@ namespace GpuWatchdog
                             }
                             if (ui?.estNextHourHighUSD != null) SetNextHour(ui);
                             // Est. Next Hour: keep Salad's window parked invisibly so it can be read (see SaladPeek)
-                            if (false && ui?.estNextHourHighUSD == null && ShouldPeek())
+                            if (ui?.estNextHourHighUSD == null && ShouldPeek())
                             {
                                 lastPeek = DateTime.Now;
                                 var ok = SaladPeek.EnsureParked();
                                 Log.Debug("Next-hour window: " + SaladPeek.LastResult);
+                                bool got = false;
                                 if (ok)
-                                    for (int i = 0; i < 20; i++)
+                                    for (int i = 0; i < 25 && !got; i++)
                                     {
                                         await Task.Delay(1000);
                                         var t2 = Earnings.ReadSaladText(); var pk = t2 == null ? null : Earnings.Parse(t2);
-                                        if (pk?.estNextHourHighUSD != null) { SetNextHour(pk); break; }
+                                        if (pk?.estNextHourHighUSD != null) { SetNextHour(pk); got = true; }
                                     }
+                                Log.Debug("Next hour from Salad: " + (got ? string.Format(Time.Inv, "${0:0.000}–${1:0.000}", nhLow, nhHigh) : "not readable (" + (Earnings.LastError ?? "no number on the page") + ")"));
+                                // don't keep trying (and opening Salad's window) if it doesn't work on this PC
+                                if (got) peekFails = 0; else if (++peekFails >= 3) { lastPeek = DateTime.Now.AddHours(2); peekFails = 0; }
                             }
                         }
                     }
@@ -601,10 +605,7 @@ namespace GpuWatchdog
                         if (nhAt > 0 && Time.Now - nhAt < 7200) { d.estNextHourLowUSD = nhLow; d.estNextHourHighUSD = nhHigh; d.nextHourAt = nhAt; d.nextHourFrom = "salad"; }
                         else
                         {
-                            // Salad's window isn't open: estimate from what you actually earned over the last 1-3 hours
-                            var h = HourlyFromHistory();
-                            if (h != null && SaladState == "chopping") { d.estNextHourLowUSD = h.Item1; d.estNextHourHighUSD = h.Item2; d.nextHourAt = Time.Now; d.nextHourFrom = "history"; }
-                            else { d.estNextHourLowUSD = d.estNextHourHighUSD = null; d.nextHourAt = 0; }
+                            d.estNextHourLowUSD = d.estNextHourHighUSD = null; d.nextHourAt = 0;   // only Salad's own number is shown
                         }
                         d.lastPayoutUSD = LastPayoutUSD; d.lastPayoutAt = LastPayoutAt;
                         Earn = d; EarnStatus = "OK";
@@ -623,7 +624,7 @@ namespace GpuWatchdog
             }
         }
 
-        double? nhLow, nhHigh; long nhAt; DateTime lastPeek = DateTime.MinValue;
+        double? nhLow, nhHigh; long nhAt; DateTime lastPeek = DateTime.MinValue; int peekFails;
         void SetNextHour(EarningsData x) { nhLow = x.estNextHourLowUSD; nhHigh = x.estNextHourHighUSD; nhAt = Time.Now; }
         /// <summary>Only while you're away (no mouse/keyboard for 3 min), no game running, Salad chopping, at most every 15 min.</summary>
         bool ShouldPeek()

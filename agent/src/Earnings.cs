@@ -181,7 +181,7 @@ namespace GpuWatchdog
                 var findFirst = AE.GetMethod("FindFirst");
                 var findAll = AE.GetMethod("FindAll");
 
-                var texts = new List<string>();
+                var texts = new List<string>(); object earnEl = null;
                 var fromHandle = AE.GetMethod("FromHandle");
                 foreach (var p in Process.GetProcessesByName("Salad"))
                 {
@@ -197,13 +197,27 @@ namespace GpuWatchdog
                             var cur = el.GetType().GetProperty("Current").GetValue(el);
                             var name = cur.GetType().GetProperty("Name").GetValue(cur) as string;
                             if (!string.IsNullOrWhiteSpace(name)) texts.Add(name.Trim());
+                            if (earnEl == null && name != null && name.Trim().Equals("EARN", StringComparison.OrdinalIgnoreCase)) earnEl = el;
                         }
                         if (texts.Count > 20) break;
                     }
                 }
                 if (texts.Count == 0) { LastError = "Salad's window doesn't share its text while it's hidden in the tray."; return null; }
                 LastError = null;
-                return string.Join(" ", texts);
+                var joined = string.Join(" ", texts);
+                // the invisible (parked) window may be on another page: switch it to the Earn page, where "Est. Next Hour" is
+                if (earnEl != null && SaladPeek.Parked && joined.IndexOf("Next Hour", StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    try
+                    {
+                        var IP = uia.GetType("System.Windows.Automation.InvokePattern");
+                        var pat = IP.GetField("Pattern").GetValue(null);
+                        var p = AE.GetMethod("GetCurrentPattern").Invoke(earnEl, new[] { pat });
+                        p.GetType().GetMethod("Invoke").Invoke(p, null);
+                    }
+                    catch { }
+                }
+                return joined;
             }
             catch (Exception e) { LastError = (e.InnerException ?? e).Message; return null; }
         }
@@ -233,6 +247,20 @@ namespace GpuWatchdog
         [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
         [DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr h, System.Text.StringBuilder sb, int max);
+        [DllImport("user32.dll")] static extern bool GetCursorPos(out POINT p);
+        [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(POINT p);
+        [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr h, uint flags);
+        [StructLayout(LayoutKind.Sequential)] struct POINT { public int X, Y; }
+        static string ClassOf(IntPtr h) { var sb = new System.Text.StringBuilder(128); GetClassName(h, sb, 128); return sb.ToString(); }
+        /// <summary>Is the mouse over the taskbar / tray (where you'd click Salad's icon)?</summary>
+        static bool MouseOnTaskbar()
+        {
+            if (!GetCursorPos(out var p)) return false;
+            var root = GetAncestor(WindowFromPoint(p), 2 /*GA_ROOT*/);
+            var c = ClassOf(root);
+            return c == "Shell_TrayWnd" || c == "Shell_SecondaryTrayWnd" || c == "NotifyIconOverflowWindow" || c == "TopLevelWindowForOverflowXamlIsland" || c.StartsWith("Xaml");
+        }
+        static int saladProcs; static DateTime ourLaunchAt;
         [StructLayout(LayoutKind.Sequential)] struct RECT { public int L, T, R, B; }
         const int GWL_EXSTYLE = -20, WS_EX_LAYERED = 0x80000, WS_EX_TOOLWINDOW = 0x80, WS_EX_APPWINDOW = 0x40000;
         const uint SWP_NOSIZE = 1, SWP_NOZORDER = 4, SWP_NOACTIVATE = 0x10, LWA_ALPHA = 2;
@@ -282,6 +310,7 @@ namespace GpuWatchdog
             try
             {
                 // 1) open Salad again (as you, through Explorer): a running Salad shows its window
+                ourLaunchAt = DateTime.Now;
                 if (File.Exists(Salad.AppPath)) Process.Start(new ProcessStartInfo("explorer.exe", "\"" + Salad.AppPath + "\"") { UseShellExecute = false });
                 if (watcher.Join(5000) && found != IntPtr.Zero) { LastResult = "opened"; return true; }
                 // 2) the same message Windows sends when you click Salad's tray icon
@@ -311,13 +340,19 @@ namespace GpuWatchdog
                 SetWindowLong(h, GWL_EXSTYLE, (origEx | WS_EX_LAYERED | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW);
                 SetLayeredWindowAttributes(h, 0, 0, LWA_ALPHA);
                 SetWindowPos(h, IntPtr.Zero, -32000, -32000, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+                parkFg = fg;
                 parked = h; parkedAt = DateTime.Now; inputAtPark = Native.LastInputTick();
+                saladProcs = Process.GetProcessesByName("Salad").Length;
             }
             GiveFocusBack(fg);
         }
 
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr FindWindow(string cls, string title);
+        static IntPtr parkFg;
         static void GiveFocusBack(IntPtr fg)
         {
+            if (fg == IntPtr.Zero) fg = parkFg;
+            if (fg == IntPtr.Zero || !IsWindow(fg)) fg = FindWindow("Shell_TrayWnd", null);
             if (fg == IntPtr.Zero) return;
             try
             {
@@ -358,13 +393,14 @@ namespace GpuWatchdog
                         if (h == IntPtr.Zero) { lastFg = GetForegroundWindow(); continue; }
                         if (!IsWindow(h)) { lock (Gate) parked = IntPtr.Zero; continue; }
                         if (!IsWindowVisible(h)) { Release(); continue; }          // Salad hid it to the tray itself
-                        if (GetForegroundWindow() == h)
-                        {
-                            // you clicked Salad's tray icon (there was mouse/keyboard input since parking): show it normally
-                            if (Native.LastInputTick() != inputAtPark && (DateTime.Now - parkedAt).TotalSeconds > 2) { Release(); Log.Debug("Salad opened by you; window shown normally."); }
-                            else GiveFocusBack(lastFg);
-                        }
-                        else lastFg = GetForegroundWindow();
+                        var fgNow = GetForegroundWindow();
+                        bool becameFg = fgNow == h && lastFg != h;
+                        // you opened Salad yourself: clicked its tray icon, or started Salad again from a shortcut
+                        bool userOpened = (becameFg && (DateTime.Now - parkedAt).TotalSeconds > 3 && MouseOnTaskbar())
+                            || (Process.GetProcessesByName("Salad").Length > saladProcs && (DateTime.Now - ourLaunchAt).TotalSeconds > 20);
+                        if (userOpened) { Release(); Log.Debug("Salad opened by you; window shown normally."); continue; }
+                        if (fgNow == h) GiveFocusBack(lastFg != h && lastFg != IntPtr.Zero ? lastFg : IntPtr.Zero);   // never keep the invisible window in front
+                        else lastFg = fgNow;
                     }
                     catch { }
                 }
