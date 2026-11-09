@@ -60,8 +60,8 @@ button{font:inherit;color:inherit;cursor:pointer;background:none;border:0}
 .hero::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,transparent 48%,rgba(7,9,12,.88) 80%,var(--bg) 100%)}
 .hero-read{position:absolute;z-index:2;left:16px;right:16px;bottom:12px;display:grid;grid-template-columns:1fr auto;align-items:end}
 .hero-read .lbl{grid-column:1/-1}
-.big{font-size:76px;font-weight:300;line-height:.9;letter-spacing:-.05em;margin-top:8px;transition:color .6s}
-.big sup{font-size:26px;font-weight:400;vertical-align:top;margin-left:6px;color:var(--mute);letter-spacing:.04em;line-height:1.4}
+.big{font-size:104px;font-weight:300;line-height:.9;letter-spacing:-.05em;margin-top:8px;transition:color .6s}
+.big sup{font-size:34px;font-weight:400;vertical-align:top;margin-left:6px;color:var(--mute);letter-spacing:.04em;line-height:1.4}
 .mrow{display:grid;gap:5px;text-align:right}
 .mrow>div{display:flex;gap:8px;justify-content:flex-end;align-items:baseline}
 .mrow .lbl{font-size:10px}
@@ -74,6 +74,7 @@ button{font:inherit;color:inherit;cursor:pointer;background:none;border:0}
 .tiles4{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
 .tile{padding:13px 14px 10px;min-width:0}
 .tile .v{font-size:26px;font-weight:500;margin:6px 0 2px}
+#t-core,#t-hot{font-size:42px;font-weight:400;margin-top:8px}
 .tile .v small{font-size:13px;color:var(--mute);font-weight:500;margin-left:2px}
 .bolt{font-size:.62em;margin-right:5px;vertical-align:.18em;filter:saturate(.9)}
 .tile .s{font-size:11px;color:var(--dim);line-height:1.35;margin-top:4px}

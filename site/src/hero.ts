@@ -168,6 +168,24 @@ export class Hero {
     const k = this.meta.photoW / (img.naturalWidth || BASE_W);
     ctx.setTransform(v.s * k, 0, 0, v.s * k, v.x, v.y);
     if (!this.cutout) ctx.drawImage(img, 0, 0);
+    if (!this.cutout && this.fit() === "card") {
+      // phones: the photo does not reach every screen edge, so melt its edges softly into the page instead of a hard grey block
+      const px = v.x, py = v.y, pw = this.meta.photoW * v.s, ph = this.meta.photoH * v.s;
+      const f = Math.min(pw, ph) * 0.22;
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalCompositeOperation = "destination-out";
+      const strip = (x0: number, y0: number, x1: number, y1: number, rx: number, ry: number, rw: number, rh: number) => {
+        const g = ctx.createLinearGradient(x0, y0, x1, y1);
+        g.addColorStop(0, "rgba(0,0,0,1)"); g.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = g; ctx.fillRect(rx, ry, rw, rh);
+      };
+      strip(px, 0, px + f, 0, px, py, f, ph);
+      strip(px + pw, 0, px + pw - f, 0, px + pw - f, py, f, ph);
+      strip(0, py, 0, py + f, px, py, pw, f);
+      strip(0, py + ph, 0, py + ph - f, px, py + ph - f, pw, f);
+      ctx.restore();
+    }
     ctx.setTransform(v.s, 0, 0, v.s, v.x, v.y);
     if (this.cutout && this.meta.card) {
       // just the card: a soft shadow and a faint temperature-coloured glow underneath instead of the photo's floor

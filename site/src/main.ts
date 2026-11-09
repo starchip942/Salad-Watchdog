@@ -102,11 +102,9 @@ function render() {
   tween($("gpu-power"), g.powerW, unit(" W"));
   const fan = g.fans?.[0];
   tween($("gpu-fans"), fan?.pct ?? null, v => `${Math.round(v)}<small>%</small>`);
-  spark($("spark-gpu"), last5min(h => h.g[0]), tempColor(g.tempC), 44);
 
   const core = $("t-core"); tween(core, g.coreC, deg()); core.className = "v num " + tempClass(g.coreC);
   const hot = $("t-hot"); tween(hot, g.hotspotC, deg()); hot.className = "v num " + tempClass(g.hotspotC);
-  spark($("spark-core"), last5min(h => h.g[0]), tempColor(g.coreC));
   tween($("t-vram"), isNum(g.vramUsedMB) ? g.vramUsedMB / 1024 : null, v => `${v.toFixed(1)}<small>/ ${isNum(g.vramTotalMB) ? Math.round(g.vramTotalMB / 1024) : "?"} GB</small>`);
   $("t-vram-bar").style.width = isNum(g.vramUsedMB) && isNum(g.vramTotalMB) ? (g.vramUsedMB / g.vramTotalMB * 100) + "%" : "0";
   tween($("t-power"), g.powerW, watts);
