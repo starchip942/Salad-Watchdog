@@ -178,8 +178,8 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
         <div class="glass c sys">
           <div class="sysrow"><div class="syshead"><h3>CPU</h3><span id="m-cpuname"></span></div>
             <div class="sysvals"><div><div class="lbl">Temperature</div><div class="mv num" id="m-cpu">--</div></div><div><div class="lbl">Power Draw</div><div class="mv num" id="m-cpupow">--</div></div></div></div>
-          <div class="sysrow"><div class="syshead"><h3>Memory</h3><span>2 DIMMs</span></div><div class="sysvals num" id="m-ram"></div></div>
-          <div class="sysrow"><div class="syshead"><h3>Storage</h3><span>2 SSDs</span></div><div class="sysvals num" id="m-ssd"></div></div>
+          <div class="sysrow"><div class="syshead"><h3>Memory</h3></div><div class="sysvals num" id="m-ram"></div></div>
+          <div class="sysrow"><div class="syshead"><h3>Storage</h3></div><div class="sysvals num" id="m-ssd"></div></div>
         </div>
       </div>
       <div class="glass c" style="padding:12px 18px"><div id="m-status" class="statusrow"></div></div>
@@ -471,9 +471,9 @@ function renderMonitor(S) {
   $("m-ssd").innerHTML = pair(t.ssd, "ssd", [{ name: "SSD 1" }, { name: "SSD 2" }]);
   const next = t.schedules.filter(x => !x.missed)[0];
   $("m-status").innerHTML = [
-    ["Website", S.relay.connected ? `connected · ${S.relay.viewers} watching` : "not connected"],
-    ["Games", s.gameMode.activeGame ? esc(s.gameMode.activeGame) + " running" : "none running"],
-    ["Safety stop", S.lockout ? '<b style="color:var(--red)">LOCKED OUT</b>' : t.safety.enabled ? `on · ${t.safety.limitC} °C` : '<span style="color:var(--amber)">off</span>'],
+    ["Website", S.relay.connected ? "connected" : "not connected"],
+    ...(s.gameMode.activeGame ? [["Game running", esc(s.gameMode.activeGame)]] : []),
+    ...(S.lockout ? [["Safety stop", '<b style="color:var(--red)">LOCKED OUT</b>']] : !t.safety.enabled ? [["Safety stop", '<span style="color:var(--amber)">off</span>']] : []),
     ["Next schedule", next ? (next.action === "pc_off" ? "PC off · " : "Close Salad · ") + fmtT(next.at) : "none"],
     ...(t.shutdown.pendingAt ? [["Shutdown", `<b style="color:var(--red)">in ${Math.max(0, t.shutdown.pendingAt - Math.floor(Date.now() / 1000))} s</b>`]] : []),
   ].map(([k, v]) => `<div><span>${k}</span><span>${v}</span></div>`).join("");

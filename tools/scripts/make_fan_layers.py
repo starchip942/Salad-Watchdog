@@ -17,7 +17,7 @@ FANS = [((2318.2, 1011.3), (132.5, 162.3), 141.4, 2.90),
         ((2853.4, 1133.1), (141.6, 166.2), 133.8, 2.90),
         ((3424.9, 1263.2), (149.7, 171.6), 122.9, 3.05)]
 R = 420                      # frontal rotor radius in the unwarped working space
-S = int(R * 2.4); C = S / 2  # working square (room for the blurred ring past the blade tips)
+S = int(R * 2.6); C = S / 2  # working square (room for the blurred ring past the blade tips)
 yy, xx = np.mgrid[0:S, 0:S]; rr = np.hypot(xx - C, yy - C)
 
 def fan_affine(c, w, h, ang, k):
@@ -51,7 +51,7 @@ for i, (c, (w, h), ang, k) in enumerate(FANS):
         acc += cv2.warpAffine(un, Mr, (S, S), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE).astype(np.float32)
     behind = acc / steps * 0.8
     # blur reaches past the blade tips (so no still blade edges peek out) and fades out softly
-    hole = (np.clip((R * 1.11 - rr) / (R * 0.07), 0, 1) * 255).astype(np.uint8)
+    hole = (np.clip((R * 1.22 - rr) / (R * 0.09), 0, 1) * 255).astype(np.uint8)
     # rotor RGBA, plus rotational blur levels for high speeds (anti wagon-wheel)
     rgba = np.dstack([un, alpha])
     for lvl, span in enumerate([0, 10, 24, 50]):
