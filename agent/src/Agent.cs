@@ -325,15 +325,16 @@ namespace GpuWatchdog
                 {
                     msg = Salad.Launch();
                     // the service needs about half a minute to sign in, and a Start sent before that may be lost
-                    chopNextTry = Time.Now + 45; chopUntil = Time.Now + 240;
-                    Log.Info($"Salad starting ({who.ToLowerInvariant()}); chopping in about a minute.");
-                    return (true, msg + " It will start chopping in about a minute.");
+                    // try Chop Now from the first seconds on (it fails harmlessly until Salad's service is ready), then keep confirming
+                    chopNextTry = Time.Now + 5; chopUntil = Time.Now + 240; chopVerifyUntil = Time.Now + 600;
+                    Log.Info($"Salad starting in the tray ({who.ToLowerInvariant()}), then Chop Now.");
+                    return (true, msg + " Chop Now is sent as soon as Salad is ready (Salad may show Waiting for idle for a moment).");
                 }
                 try
                 {
                     Salad.Call(Salad.StartMethod);
                     Log.Info($"Salad: start chopping ({who.ToLowerInvariant()}).");
-                    chopUntil = 0; chopVerifyUntil = Time.Now + 600; chopNextTry = Time.Now + 60;
+                    chopUntil = 0; chopVerifyUntil = Time.Now + 600; chopNextTry = Time.Now + 20;
                     msg = "Salad has started chopping.";
                 }
                 catch (Exception e)
@@ -366,7 +367,7 @@ namespace GpuWatchdog
                     PausedByUs = false;
                     // accepted isn't always acted on (Salad still signing in): check it really starts, else send Start again
                     if (chopVerifyUntil == 0) chopVerifyUntil = now + 600;
-                    chopUntil = 0; chopNextTry = now + 60;
+                    chopUntil = 0; chopNextTry = now + 20;
                 }
                 catch (Exception e)
                 {
@@ -375,7 +376,7 @@ namespace GpuWatchdog
                         if (chopVerifyUntil == 0) Log.Warn("Couldn't start Salad chopping (Chop Now): " + e.Message); else Log.Debug("Chop Now not taken yet: " + e.Message);
                         chopUntil = 0; chopNextTry = now + 20;
                     }
-                    else chopNextTry = now + 10;
+                    else chopNextTry = now + 5;
                 }
             }
         }
