@@ -104,13 +104,13 @@ function render() {
   tween($("gpu-fans"), fan?.pct ?? null, v => `${Math.round(v)}<small>%</small>`);
 
   const core = $("t-core"); tween(core, g.coreC, deg()); core.className = "v num " + tempClass(g.coreC);
-  const hot = $("t-hot"); tween(hot, g.hotspotC, deg()); hot.className = "v num " + tempClass(g.hotspotC);
+  const hot = $("t-hot"); tween(hot, g.hotspotC, deg()); hot.className = "v num " + tempClass(g.hotspotC, "hot");
   tween($("t-vram"), isNum(g.vramUsedMB) ? g.vramUsedMB / 1024 : null, v => `${v.toFixed(1)}<small>/ ${isNum(g.vramTotalMB) ? Math.round(g.vramTotalMB / 1024) : "?"} GB</small>`);
   $("t-vram-bar").style.width = isNum(g.vramUsedMB) && isNum(g.vramTotalMB) ? (g.vramUsedMB / g.vramTotalMB * 100) + "%" : "0";
   tween($("t-power"), g.powerW, watts);
 
   const cc = $("c-core"); cc.textContent = isNum(g.coreC) ? `${Math.round(g.coreC)} °C` : "N/A"; cc.className = "t num " + tempClass(g.coreC);
-  const ch = $("c-hot"); ch.textContent = isNum(g.hotspotC) ? `${Math.round(g.hotspotC)} °C` : "N/A"; ch.className = "t num " + tempClass(g.hotspotC);
+  const ch = $("c-hot"); ch.textContent = isNum(g.hotspotC) ? `${Math.round(g.hotspotC)} °C` : "N/A"; ch.className = "t num " + tempClass(g.hotspotC, "hot");
   const glowC = tempColor(g.coreC);
   (corewrap.querySelector(".dieglow") as HTMLElement).style.boxShadow = S.online && isNum(g.coreC)
     ? `0 0 ${30 + Math.max(0, g.coreC - 40)}px ${4 + Math.max(0, (g.coreC - 40) / 6)}px ${glowC}40, inset 0 0 30px ${glowC}30` : "none";

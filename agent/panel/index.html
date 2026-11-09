@@ -317,7 +317,7 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const api = (p, body) => fetch(p, { method: body ? "POST" : "GET", headers: { "X-Panel-Token": TOKEN, "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined }).then(r => r.json());
 let S = null, page = "monitor", toast = $("g-msg");
 const isNum = v => typeof v === "number" && isFinite(v);
-const tc = (c, k = "gpu") => { if (!isNum(c)) return "na"; const [a, b, d] = k === "gpu" ? [45, 72, 83] : k === "cpu" ? [45, 75, 88] : [40, 55, 70]; return c < a ? "t-cool" : c < b ? "t-ok" : c < d ? "t-warm" : "t-hot"; };
+const tc = (c, k = "gpu") => { if (!isNum(c)) return "na"; const [a, b, d] = k === "gpu" ? [45, 65, 75] : k === "hot" ? [45, 75, 85] : k === "cpu" ? [45, 75, 88] : [40, 55, 70]; return c < a ? "t-cool" : c < b ? "t-ok" : c < d ? "t-warm" : "t-hot"; };
 const deg = v => isNum(v) ? `${Math.round(v)}<small> °C</small>` : `<span class="na">N/A</span>`;
 const fmtT = t => new Date(t * 1000).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" });
 const LABEL = { not_running: "Not running", idle: "Idle / waiting", paused: "Paused", chopping: "Chopping", locked_out: "Locked out", unknown: "Checking…" };
@@ -454,7 +454,7 @@ function renderMonitor(S) {
   $("m-gpuname").textContent = (g.name || "GPU").replace("NVIDIA GeForce ", "");
   $("m-gpu").innerHTML = isNum(g.tempC) ? `${Math.round(g.tempC)}<sup>°C</sup>` : "N/A"; $("m-gpu").className = "mbig num " + tc(g.tempC);
   $("m-core").innerHTML = `<span class="${tc(g.coreC)}">${deg(g.coreC)}</span>`;
-  $("m-hot").innerHTML = `<span class="${tc(g.hotspotC)}">${deg(g.hotspotC)}</span>`;
+  $("m-hot").innerHTML = `<span class="${tc(g.hotspotC, "hot")}">${deg(g.hotspotC)}</span>`;
   $("m-util").innerHTML = isNum(g.util) ? `${g.util}<small>%</small>` : "N/A";
   $("m-pow").innerHTML = W(g.powerW);
   $("m-fan").innerHTML = f && isNum(f.pct) ? `${f.pct}<small>%</small>` : "N/A";

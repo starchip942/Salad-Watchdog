@@ -44,14 +44,14 @@ export function logTime(epochSec: number, tz?: string): string {
 }
 
 /** cool cyan -> green -> amber -> red; GPU throttle zone starts ~83 °C */
-export function tempClass(c: Num, kind: "gpu" | "cpu" | "ram" | "ssd" = "gpu"): string {
+export function tempClass(c: Num, kind: "gpu" | "hot" | "cpu" | "ram" | "ssd" = "gpu"): string {
   if (!isNum(c)) return "na";
-  const [cool, ok, warm] = kind === "gpu" ? [45, 72, 83] : kind === "cpu" ? [45, 75, 88] : kind === "ram" ? [40, 55, 70] : [40, 55, 68];
+  const [cool, ok, warm] = kind === "gpu" ? [45, 65, 75] : kind === "hot" ? [45, 75, 85] : kind === "cpu" ? [45, 75, 88] : kind === "ram" ? [40, 55, 70] : [40, 55, 68];
   return c < cool ? "t-cool" : c < ok ? "t-ok" : c < warm ? "t-warm" : "t-hot";
 }
 export function tempColor(c: Num): string {
   if (!isNum(c)) return "#5b6676";
-  return c < 45 ? "#3fd6ff" : c < 72 ? "#44e08a" : c < 83 ? "#ffb547" : "#ff4d5e";
+  return c < 45 ? "#3fd6ff" : c < 65 ? "#44e08a" : c < 75 ? "#ffb547" : "#ff4d5e";
 }
 
 export function esc(s: string): string {

@@ -575,6 +575,12 @@ namespace GpuWatchdog
                                 if (d == null) d = ui;
                             }
                             if (ui?.estNextHourHighUSD != null) SetNextHour(ui);
+                            else if ((DateTime.Now - lastNhDiag).TotalMinutes >= 10)
+                            {
+                                lastNhDiag = DateTime.Now;
+                                var at = text?.IndexOf("Next Hour", StringComparison.OrdinalIgnoreCase) ?? -1;
+                                Log.Debug("Next hour not on Salad's page: " + (text == null ? "no text (" + Earnings.LastError + ")" : at < 0 ? text.Length + " chars, no 'Next Hour'" : "unparsed: " + text.Substring(at, Math.Min(60, text.Length - at))));
+                            }
                             // Est. Next Hour: keep Salad's window parked invisibly so it can be read (see SaladPeek)
                             if (ui?.estNextHourHighUSD == null && ShouldPeek())
                             {
@@ -624,7 +630,7 @@ namespace GpuWatchdog
             }
         }
 
-        double? nhLow, nhHigh; long nhAt; DateTime lastPeek = DateTime.MinValue; int peekFails;
+        double? nhLow, nhHigh; long nhAt; DateTime lastPeek = DateTime.MinValue; int peekFails; DateTime lastNhDiag = DateTime.MinValue;
         void SetNextHour(EarningsData x) { nhLow = x.estNextHourLowUSD; nhHigh = x.estNextHourHighUSD; nhAt = Time.Now; }
         /// <summary>Only while you're away (no mouse/keyboard for 3 min), no game running, Salad chopping, at most every 15 min.</summary>
         bool ShouldPeek()
