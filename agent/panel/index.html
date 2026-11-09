@@ -172,7 +172,6 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
           <div class="lbl" style="margin-top:14px">Salad Balance</div>
           <div class="bal num" id="m-bal">--</div>
           <div class="kv num"><div><div class="lbl">Last 24 h</div><div id="m-24" style="color:var(--green)">--</div></div><div><div class="lbl">Last payout</div><div id="m-pay">--</div></div><div style="grid-column:1/-1"><div class="lbl">Est. next hour</div><div id="m-nh">--</div></div></div>
-          <div class="hs" id="m-earn-note"></div>
         </div>
         <div class="glass c sys">
           <div class="sysrow"><div class="syshead"><h3>CPU</h3><span id="m-cpuname"></span></div>
@@ -468,7 +467,6 @@ function renderMonitor(S) {
   const nhTxt = e && isNum(e.estNextHourHighUSD) ? `$${e.estNextHourLowUSD.toFixed(4)} ~ $${e.estNextHourHighUSD.toFixed(4)}` : null;
   $("m-nh").innerHTML = nhTxt ?? `<span style="color:var(--dim);font-weight:400">—</span>`;
   const ago = e && e.updatedAt ? Math.round((Date.now() / 1000 - e.updatedAt) / 60) : null;
-  $("m-earn-note").textContent = S.earningsStatus && S.earningsStatus !== "OK" ? S.earningsStatus + (e ? " Showing the last values read." : "") : e && !isNum(e.lastPayoutUSD) ? "Last payout appears the next time Salad adds to your balance." : "";
   $("m-cpuname").textContent = t.cpu.name || "";
   $("m-cpu").innerHTML = `<span class="${tc(t.cpu.tempC, "cpu")}">${deg(t.cpu.tempC)}</span>`;
   $("m-cpupow").innerHTML = W(t.cpu.powerW);
