@@ -53,7 +53,7 @@ namespace GpuWatchdog
             Hold = Json.Bool(st, "hold") ?? false;
             PausedForGame = Json.Bool(st, "pausedForGame") ?? false;
             var e0 = Json.Load<EarningsData>(Paths.Cfg("earnings.json"));
-            if (e0.balanceUSD != null) { LastPayoutUSD = e0.lastPayoutUSD; LastPayoutAt = e0.lastPayoutAt; Earn = e0; EarnStatus = "Last read " + Time.Short(e0.updatedAt) + "."; }
+            if (e0.balanceUSD != null) { LastPayoutUSD = e0.lastPayoutUSD; LastPayoutAt = e0.lastPayoutAt; if (e0.nextHourAt > 0) { nhLow = e0.estNextHourLowUSD; nhHigh = e0.estNextHourHighUSD; nhAt = e0.nextHourAt; } Earn = e0; EarnStatus = "Last read " + Time.Short(e0.updatedAt) + "."; }
 
             foreach (var s in Sched.Items.Where(s => !s.Missed && s.At < Time.Now - 60))
             {
@@ -68,7 +68,7 @@ namespace GpuWatchdog
             Log.Info($"Sensors: GPU {(sensors.NvmlOk ? "OK" : "unavailable (" + sensors.NvmlError + ")")}, hotspot {(r.GpuHotspot != null ? "OK" : "N/A")}, CPU {(r.CpuTemp != null ? "OK" : "N/A")}, " +
                      $"RAM {r.Ram.Count(x => x.tempC != null)}/2, SSD {r.Ssd.Count(x => x.tempC != null)}/{Math.Max(2, r.Ssd.Count)}.");
             if (Lock.Active) Log.Error($"Emergency lockout is still active (GPU reached {Lock.TempC:0} °C at {Time.Short(Lock.At)}). Salad stays off until you clear it in the panel.");
-            if (Hold) Log.Info("A hold from earlier is still active: Game Mode won't restart Salad until you press Start chopping.");
+            if (Hold) Log.Info("Salad hold still active from earlier: it won't restart after games until you press Start chopping.");
             Games.Rescan(true);
 
             Relay.OnCommand = (cmd, args) => Command(cmd, args, "website");
@@ -91,7 +91,7 @@ namespace GpuWatchdog
                 var rep = Path.Combine(Paths.Logs, "discovery-report.txt");
                 var exe = System.Reflection.Assembly.GetExecutingAssembly().Location;
                 if (File.Exists(rep) && File.GetLastWriteTime(rep) > File.GetLastWriteTime(exe)) return;
-                try { Discovery.Run(true, sensors); Log.Info("Hardware check written to logs\\discovery-report.txt."); } catch (Exception e) { Log.Warn("Hardware check failed: " + e.Message); }
+                try { Discovery.Run(true, sensors); Log.Debug("Hardware check written to logs\\discovery-report.txt."); } catch (Exception e) { Log.Warn("Hardware check failed: " + e.Message); }
             });
         }
 
@@ -172,7 +172,7 @@ namespace GpuWatchdog
                 if (++nullTemps == 3) { SensorFail = true; Log.Warn("Can't read the GPU temperature, so the safety stop can't check it. Salad is not stopped on missing data."); Notify?.Invoke("GPU Watchdog", "Can't read the GPU temperature."); }
                 return;
             }
-            if (nullTemps >= 3) Log.Info("The GPU temperature can be read again.");
+            if (nullTemps >= 3) Log.Info("GPU temperature readable again.");
             nullTemps = 0; SensorFail = false;
             if (!s.SafetyEnabled || Lock.Active) { overLimit = 0; return; }
 
@@ -271,21 +271,21 @@ namespace GpuWatchdog
                     msg = Salad.Launch();
                     // the service needs about half a minute to sign in, and a Start sent before that may be lost
                     chopNextTry = Time.Now + 45; chopUntil = Time.Now + 240;
-                    Log.Info($"{who}: Start chopping. {msg} Chop Now follows once it has signed in.");
+                    Log.Info($"Salad starting ({who.ToLowerInvariant()}); chopping in about a minute.");
                     return (true, msg + " It will start chopping in about a minute.");
                 }
                 try
                 {
                     WindowGuard.HideNew(8, "Salad");
                     Salad.Call(Salad.StartMethod);
-                    Log.Info($"{who}: Start chopping. Salad has started chopping.");
+                    Log.Info($"Salad: start chopping ({who.ToLowerInvariant()}).");
                     chopUntil = 0;
                     msg = "Salad has started chopping.";
                 }
                 catch (Exception e)
                 {
                     chopNextTry = Time.Now + 5; chopUntil = Time.Now + 60;
-                    Log.Info($"{who}: Start chopping. Salad didn't take it yet ({e.Message}); trying again for a minute.");
+                    Log.Debug($"{who}: Start chopping not taken yet ({e.Message}); retrying.");
                     msg = "Asked Salad to start; retrying for a minute.";
                 }
             }
@@ -303,7 +303,7 @@ namespace GpuWatchdog
                 {
                     WindowGuard.HideNew(8, "Salad");
                     Salad.Call(Salad.StartMethod);
-                    Log.Info("Salad has started chopping.");
+                    Log.Debug("Salad accepted Start.");
                     chopUntil = 0; PausedByUs = false;
                 }
                 catch (Exception e)
@@ -321,12 +321,12 @@ namespace GpuWatchdog
             {
                 chopUntil = 0;
                 if (setHold) { Hold = true; SaveState(); }
-                if (!Salad.AnyRunning()) { Log.Info($"{who} Pause chopping. Salad is not running."); return (true, "Salad is not running."); }
+                if (!Salad.AnyRunning()) { return (true, "Salad is not running."); }
                 try
                 {
                     Salad.Call(Salad.StopMethod);
                     PausedByUs = true;
-                    Log.Info($"{who} Pause chopping. Chopping stopped; Salad stays open.");
+                    Log.Info($"Salad: chopping paused ({who.TrimEnd(':', ' ', '→').ToLowerInvariant()}).");
                     UpdateSaladState();
                     return (true, "Chopping paused. Salad stays open.");
                 }
@@ -349,7 +349,7 @@ namespace GpuWatchdog
                 chopUntil = 0; Hold = true; PausedByUs = false; PausedForGame = false; SaveState();
                 res = Salad.Close();
             }
-            Log.Info($"{who}: Close Salad. {res}");
+            Log.Info($"Salad closed ({who.ToLowerInvariant()}).");
             lastSaladCheck = 0; distroRunning = false; UpdateSaladState();
             return (true, res);
         }
@@ -357,7 +357,7 @@ namespace GpuWatchdog
         public (bool ok, string msg) ClearHold()
         {
             Hold = false; SaveState();
-            Log.Info("Hold cleared on the PC. Game Mode may restart Salad after a game.");
+            Log.Debug("Hold cleared on the PC.");
             return (true, "Hold cleared.");
         }
 
@@ -365,7 +365,7 @@ namespace GpuWatchdog
         void GameCheck(long now)
         {
             Games.Rescan();
-            if (!Conf.S.GameModeEnabled) { ActiveGames = new List<RunningGame>(); return; }
+            // games always stop Salad (no on/off switch)
             var games = Games.Running();
             var before = ActiveGames;
             ActiveGames = games;
@@ -374,30 +374,30 @@ namespace GpuWatchdog
             foreach (var g in games.Where(g => !before.Any(b => b.Name == g.Name)))
             {
                 gamesClosedAt = 0;
-                if (Lock.Active) { Log.Info($"{g.Name} started ({g.Program}). Salad is locked out, nothing to pause."); continue; }
+                if (Lock.Active) { Log.Debug($"{g.Name} started; Salad is locked out."); continue; }
                 if (SaladState == "chopping" || SaladState == "idle")
                 {
-                    var r = Pause($"{g.Name} started ({g.Program}) →", false);
+                    var r = Pause($"{g.Name} started", false);
                     PausedForGame = true; SaveState();
                 }
-                else Log.Info($"{g.Name} started ({g.Program}). Salad isn't chopping, so there is nothing to pause.");
+                else Log.Debug($"{g.Name} started; Salad wasn't chopping.");
             }
             if (games.Count > 0 && SaladState == "chopping" && PausedForGame && !Lock.Active)
             {
-                Pause($"Salad started chopping again while {games[0].Name} is open →", false);
+                Pause($"{games[0].Name} still open", false);
             }
             foreach (var g in before.Where(b => !games.Any(x => x.Name == b.Name)))
-                Log.Info(games.Count == 0 ? $"{g.Name} closed. Waiting {Conf.S.GameResumeDelaySec} s." : $"{g.Name} closed; {games[0].Name} is still running.");
+                Log.Debug(games.Count == 0 ? $"{g.Name} closed; waiting {Conf.S.GameResumeDelaySec} s." : $"{g.Name} closed; {games[0].Name} still running.");
             if (before.Count > 0 && games.Count == 0) gamesClosedAt = now;
 
             if (games.Count == 0 && gamesClosedAt > 0 && now - gamesClosedAt >= Conf.S.GameResumeDelaySec)
             {
                 gamesClosedAt = 0;
                 if (!PausedForGame) return;
-                if (Lock.Active) { Log.Info("All games closed, but Salad is locked out → not resuming."); PausedForGame = false; SaveState(); return; }
-                if (Hold) { Log.Info("All games closed, hold active → not resuming."); PausedForGame = false; SaveState(); return; }
+                if (Lock.Active) { Log.Info("Games closed; Salad stays off (locked out)."); PausedForGame = false; SaveState(); return; }
+                if (Hold) { Log.Info("Games closed; Salad stays paused (you paused it)."); PausedForGame = false; SaveState(); return; }
                 PausedForGame = false;
-                Log.Info("All games closed → Chop Now.");
+                Log.Info("Games closed → Salad chopping again.");
                 ChopNow("Game Mode");
             }
         }
@@ -415,7 +415,7 @@ namespace GpuWatchdog
                 if (!string.IsNullOrWhiteSpace(onDisk.RelayUrl) && onDisk.RelayUrl != Conf.S.RelayUrl)
                 {
                     Conf.S.RelayUrl = onDisk.RelayUrl.Trim();
-                    Log.Info("Website relay set to " + Conf.S.RelayUrl + ".");
+                    Log.Debug("Website relay set to " + Conf.S.RelayUrl + ".");
                 }
             }
             catch { }
@@ -424,7 +424,7 @@ namespace GpuWatchdog
             {
                 var exe = Path.Combine(Paths.AgentDir, "GPU-Watchdog-Agent.exe");
                 if (File.Exists(exe) && File.GetLastWriteTime(exe) > Started.AddSeconds(5) && (DateTime.Now - File.GetLastWriteTime(exe)).TotalSeconds > 5)
-                { updateSignalled = true; Log.Info("A new version of the watchdog is ready; restarting into it."); UpdateReady?.Invoke(); }
+                { updateSignalled = true; Log.Debug("New version: restarting into it."); UpdateReady?.Invoke(); }
             }
             catch { }
         }
@@ -435,10 +435,10 @@ namespace GpuWatchdog
             try { if (Mutex.TryOpenExisting("Global\\SaladGpuWatchdog", out var m)) { running = true; m.Dispose(); } } catch (UnauthorizedAccessException) { running = true; }
             if (running && !OldWatchdogRunning)
             {
-                Log.Warn("The old GPU Watchdog is running. Close it (tray icon → Exit): two watchdogs would fight over Salad. Game Mode is paused until it's closed.");
+                Log.Warn("The old GPU Watchdog is running. Close it (tray icon → Exit): two watchdogs would fight over Salad.");
                 Notify?.Invoke("GPU Watchdog", "The old GPU Watchdog is running. Please close it from its tray icon.");
             }
-            else if (!running && OldWatchdogRunning) Log.Info("The old GPU Watchdog was closed. Game Mode is active again.");
+            else if (!running && OldWatchdogRunning) Log.Debug("The old GPU Watchdog was closed.");
             OldWatchdogRunning = running;
         }
 
@@ -464,7 +464,7 @@ namespace GpuWatchdog
             var o = Proc.Run(Proc.System32("shutdown.exe"), "/s /t 30 /c \"GPU Watchdog: shutting down in 30 seconds. Cancel it from the GPU Watchdog panel or website.\"", 8000) ?? "";
             if (o.Contains("1190")) return (false, "A shutdown is already scheduled.");
             ShutdownAt = Time.Now + 30;
-            Log.Warn($"{who}: Turn PC off. Windows shuts down in 30 s (can be cancelled).");
+            Log.Warn($"PC turning off in 30 s ({who.ToLowerInvariant()}).");
             SendTelemetry();
             return (true, "Shutting down in 30 seconds. You can cancel it.");
         }
@@ -474,7 +474,7 @@ namespace GpuWatchdog
             Proc.Run(Proc.System32("shutdown.exe"), "/a", 8000);
             bool had = ShutdownAt > 0;
             ShutdownAt = 0;
-            Log.Info($"{who}: shutdown cancelled.");
+            Log.Info($"PC shutdown cancelled ({who.ToLowerInvariant()}).");
             SendTelemetry();
             return (true, had ? "Shutdown cancelled." : "No shutdown was pending (sent a cancel anyway).");
         }
@@ -498,7 +498,7 @@ namespace GpuWatchdog
             var item = new ScheduleItem { Id = Settings.NewSecret(6), Action = action, At = at, Source = who };
             lock (G) { Sched.Items.Add(item); Sched.Items.Sort((x, y) => x.At.CompareTo(y.At)); }
             SaveSchedules();
-            Log.Info($"{who}: {Label(action)} scheduled for {Time.Short(at)}.");
+            Log.Info($"{Label(action)} scheduled for {Time.Short(at)}.");
             SendTelemetry();
             return (true, $"{Label(action)} scheduled for {Time.Short(at)}." + (action == "pc_off" ? " Once off, the PC can't be turned back on remotely." : ""));
         }
@@ -509,7 +509,7 @@ namespace GpuWatchdog
             lock (G) { s = Sched.Items.FirstOrDefault(x => x.Id == id); if (s != null) Sched.Items.Remove(s); }
             if (s == null) return (false, "That schedule no longer exists.");
             SaveSchedules();
-            Log.Info($"{who}: cancelled {Label(s.Action)} at {Time.Short(s.At)}{(s.Missed ? " (missed)" : "")}.");
+            Log.Debug($"{who}: cancelled {Label(s.Action)} at {Time.Short(s.At)}.");
             SendTelemetry();
             return (true, "Schedule cancelled.");
         }
@@ -529,11 +529,6 @@ namespace GpuWatchdog
                 case "salad_chop_now": return ChopNow(w);
                 case "salad_pause": return Pause(w + ":", true);
                 case "salad_off_now": return CloseSalad(w);
-                case "gamemode_set":
-                    Conf.S.GameModeEnabled = Json.Bool(args, "enabled") ?? !Conf.S.GameModeEnabled; Conf.Save();
-                    Log.Info($"{w}: Game Mode turned {(Conf.S.GameModeEnabled ? "on" : "off")}.");
-                    SendTelemetry();
-                    return (true, "Game Mode " + (Conf.S.GameModeEnabled ? "on." : "off."));
                 case "schedule_add": return AddSchedule(args, w);
                 case "schedule_cancel": return CancelSchedule(Json.Str(args, "id"), w);
             }
@@ -561,7 +556,15 @@ namespace GpuWatchdog
                             if (ui != null && Earnings.Complete(ui))
                             {
                                 if (d == null) d = ui;
-                                else if (ui.estNextHourHighUSD != null) { d.estNextHourLowUSD = ui.estNextHourLowUSD; d.estNextHourHighUSD = ui.estNextHourHighUSD; d.nextHourFrom = "salad"; }
+                                if (ui.estNextHourHighUSD != null) SetNextHour(ui);
+                            }
+                            // Away from the PC: peek at Salad's window invisibly every 15 minutes for "Est. Next Hour"
+                            if (ui?.estNextHourHighUSD == null && ShouldPeek())
+                            {
+                                lastPeek = DateTime.Now;
+                                var pk = SaladPeek.Run();
+                                if (pk != null) SetNextHour(pk);
+                                Log.Debug("Next-hour check: " + SaladPeek.LastResult + (pk != null ? string.Format(Time.Inv, " ${0:0.000}–${1:0.000}", pk.estNextHourLowUSD, pk.estNextHourHighUSD) : ""));
                             }
                         }
                     }
@@ -570,17 +573,19 @@ namespace GpuWatchdog
                     {
                         d.updatedAt = Time.Now;
                         bool changed = Earn == null || Earn.balanceUSD != d.balanceUSD;
-                        RecordBalance(d.balanceUSD.Value);
-                        d.estNextHourLowUSD = d.estNextHourHighUSD = null;   // not shown any more
+                        bool paid = RecordBalance(d.balanceUSD.Value);
+                        // the next-hour range from Salad's window, kept until a newer one is read (shown for up to 2 hours)
+                        if (nhAt > 0 && Time.Now - nhAt < 7200) { d.estNextHourLowUSD = nhLow; d.estNextHourHighUSD = nhHigh; d.nextHourAt = nhAt; d.nextHourFrom = "salad"; }
+                        else { d.estNextHourLowUSD = d.estNextHourHighUSD = null; d.nextHourAt = 0; }
                         d.lastPayoutUSD = LastPayoutUSD; d.lastPayoutAt = LastPayoutAt;
                         Earn = d; EarnStatus = "OK";
                         try { Json.Save(Paths.Cfg("earnings.json"), d); } catch { }
-                        if (changed) Log.Earnings(string.Format(Time.Inv, "Earnings read: balance ${0:0.0000}, last 24 h {1}", d.balanceUSD, d.last24hUSD != null ? string.Format(Time.Inv, "+${0:0.0000}", d.last24hUSD) : "N/A"));
+                        if (paid) Log.Earnings(string.Format(Time.Inv, "Payout +${0:0.0000} → balance ${1:0.0000}", LastPayoutUSD, d.balanceUSD));
                     }
                     else
                     {
                         why = why ?? "Salad didn't send its balance yet.";
-                        if (why != EarnStatus) Log.Warn("Couldn't read earnings: " + why + " Showing the last values read.");
+                        if (why != EarnStatus) Log.Debug("Couldn't read earnings: " + why);
                         EarnStatus = why;
                     }
                 }
@@ -589,22 +594,35 @@ namespace GpuWatchdog
             }
         }
 
+        double? nhLow, nhHigh; long nhAt; DateTime lastPeek = DateTime.MinValue;
+        void SetNextHour(EarningsData x) { nhLow = x.estNextHourLowUSD; nhHigh = x.estNextHourHighUSD; nhAt = Time.Now; }
+        /// <summary>Only while you're away (no mouse/keyboard for 3 min), no game running, Salad chopping, at most every 15 min.</summary>
+        bool ShouldPeek()
+        {
+            if ((DateTime.Now - lastPeek).TotalMinutes < 15) return false;
+            if (ActiveGames.Count > 0 || SaladState != "chopping") return false;
+            uint idleMs = unchecked((uint)Environment.TickCount - Native.LastInputTick());
+            return idleMs > 180000;
+        }
+
         // ---------------- balance history (for the next-hour estimate) ----------------
         List<double[]> balances;
         public double? LastPayoutUSD; public long LastPayoutAt;
-        void RecordBalance(double b)
+        bool RecordBalance(double b)
         {
+            bool paid = false;
             if (balances == null) balances = Json.Load<List<double[]>>(Paths.Cfg("balance-history.json")) ?? new List<double[]>();
             long now = Time.Now;
             if (balances.Count > 0)
             {
                 var prev = balances[balances.Count - 1][1];
                 if (b < prev - 0.0001) balances.Clear();                       // you redeemed/withdrew: start over
-                else if (b > prev + 0.00001) { LastPayoutUSD = Math.Round(b - prev, 4); LastPayoutAt = now; }   // Salad credited you
+                else if (b > prev + 0.00001) { LastPayoutUSD = Math.Round(b - prev, 4); LastPayoutAt = now; paid = true; }   // Salad credited you
             }
             balances.Add(new double[] { now, b });
             balances.RemoveAll(x => x[0] < now - 4 * 3600);
             try { Json.Save(Paths.Cfg("balance-history.json"), balances); } catch { }
+            return paid;
         }
 
         /// <summary>Earned per hour over the last 1, 2 and 3 full hours (lowest and highest), or null with under an hour of data.</summary>
@@ -631,7 +649,7 @@ namespace GpuWatchdog
             var s = Conf.S;
             object earnings = null;
             if (Earn != null && (!forWebsite || s.ShowEarningsOnWebsite))
-                earnings = new Dictionary<string, object> { { "balanceUSD", Earn.balanceUSD }, { "estNextHourLowUSD", Earn.estNextHourLowUSD }, { "estNextHourHighUSD", Earn.estNextHourHighUSD }, { "last24hUSD", Earn.last24hUSD }, { "updatedAt", Earn.updatedAt }, { "lastPayoutUSD", Earn.lastPayoutUSD }, { "lastPayoutAt", Earn.lastPayoutAt > 0 ? (object)Earn.lastPayoutAt : null } };
+                earnings = new Dictionary<string, object> { { "balanceUSD", Earn.balanceUSD }, { "estNextHourLowUSD", Earn.estNextHourLowUSD }, { "estNextHourHighUSD", Earn.estNextHourHighUSD }, { "last24hUSD", Earn.last24hUSD }, { "updatedAt", Earn.updatedAt }, { "lastPayoutUSD", Earn.lastPayoutUSD }, { "lastPayoutAt", Earn.lastPayoutAt > 0 ? (object)Earn.lastPayoutAt : null }, { "nextHourAt", Earn.nextHourAt > 0 ? (object)Earn.nextHourAt : null } };
             List<ScheduleItem> sched; lock (G) sched = Sched.Items.ToList();
             var t = new Dictionary<string, object>
             {
@@ -646,7 +664,7 @@ namespace GpuWatchdog
                 { "ssd", r.Ssd.Select(x => new Dictionary<string, object> { { "name", x.name }, { "tempC", x.tempC } }).ToList() },
                 { "salad", new Dictionary<string, object> {
                     { "state", SaladState }, { "hold", Hold },
-                    { "gameMode", new Dictionary<string, object> { { "enabled", s.GameModeEnabled }, { "activeGame", ActiveGames.FirstOrDefault()?.Name } } },
+                    { "gameMode", new Dictionary<string, object> { { "activeGame", ActiveGames.FirstOrDefault()?.Name } } },
                     { "earnings", earnings } } },
                 { "safety", new Dictionary<string, object> {
                     { "limitC", s.SafetySensor == "hotspot" ? s.SafetyHotspotLimitC : s.SafetyCoreLimitC }, { "hotspotLimitC", s.SafetyHotspotLimitC },

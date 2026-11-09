@@ -21,7 +21,7 @@ export interface Env {
 
 const HISTORY_MAX = 600;        // ~10 min of 1 Hz samples
 const EVENTS_MAX = 1000;        // event-log lines kept for "show more history"
-const EVENTS_HELLO = 50;        // sent to a new viewer
+const EVENTS_HELLO = 150;       // sent to a new viewer
 const SESSION_TTL_S = 3600;
 const COMMAND_TIMEOUT_MS = 15000;
 const IP_MAX_FAILS = 5;
@@ -50,7 +50,7 @@ export default {
 
 // ---------- durable object ----------
 type Sample = Record<string, unknown> & { t: number };
-type LogEvent = { id: string; t: number; level: string; msg: string };
+type LogEvent = { id: string; t: number; level: string; msg: string; cat?: string };
 type PwRecord = { salt: string; hash: string; iter: number; ver: number };
 type Pending = { resolve: (v: unknown) => void; timer: ReturnType<typeof setTimeout> };
 
@@ -243,7 +243,8 @@ export class Hub {
     const fresh: LogEvent[] = [];
     for (const e of list) {
       if (!e || !e.id || seen.has(e.id)) continue;
-      const ev = { id: String(e.id), t: Number(e.t), level: String(e.level ?? "info"), msg: String(e.msg ?? "").slice(0, 400) };
+      const cat = ["pc", "salad", "earnings"].includes(String(e.cat)) ? String(e.cat) : "pc";
+      const ev = { id: String(e.id), t: Number(e.t), level: String(e.level ?? "info"), msg: String(e.msg ?? "").slice(0, 400), cat };
       this.events.push(ev); fresh.push(ev); seen.add(ev.id);
     }
     if (!fresh.length) return;
@@ -270,8 +271,10 @@ export class Hub {
     if (this.agentInfo.viewRequiresPassword && !(await this.checkToken(bearer(req)))) return json({ error: "password required" }, 401);
     const before = Number(url.searchParams.get("before") ?? Infinity);
     const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit") ?? 100)));
-    const older = this.events.filter(e => e.t < before).slice(-limit).reverse();
-    return json({ events: older, more: this.events.filter(e => e.t < before).length > older.length });
+    const cat = url.searchParams.get("cat");
+    const pool = this.events.filter(e => e.t < before && (!cat || (e.cat ?? "pc") === cat));
+    const older = pool.slice(-limit).reverse();
+    return json({ events: older, more: pool.length > older.length });
   }
 
   // ----- password & sessions -----

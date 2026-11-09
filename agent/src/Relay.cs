@@ -49,14 +49,14 @@ namespace GpuWatchdog
                     var wsUrl = new Uri(url.TrimEnd('/').Replace("https://", "wss://").Replace("http://", "ws://") + "/agent");
                     using (var t = new CancellationTokenSource(15000)) await ws.ConnectAsync(wsUrl, t.Token);
                     Connected = true; ConnectedSince = Time.Now; backoff = 1000; LastError = "";
-                    if (loggedDown) Log.Info("Relay reconnected."); else Log.Info("Connected to the relay.");
+                    if (loggedDown) Log.Debug("Relay reconnected."); else Log.Debug("Connected to the relay.");
                     loggedDown = false;
                     OnConnected?.Invoke();
                     await Receive();
                 }
                 catch (Exception e) { LastError = (e.InnerException ?? e).Message; }
-                if (Connected) { Log.Warn("Relay disconnected, retrying."); loggedDown = true; }
-                else if (!loggedDown && backoff >= 8000) { Log.Warn("Can't reach the relay (" + LastError + "). Retrying."); loggedDown = true; }
+                if (Connected) { Log.Debug("Relay disconnected, retrying."); loggedDown = true; }
+                else if (!loggedDown && backoff >= 8000) { Log.Debug("Can't reach the relay (" + LastError + "). Retrying."); loggedDown = true; }
                 Connected = false; Viewers = 0;
                 try { ws?.Dispose(); } catch { }
                 await Task.Delay(backoff);

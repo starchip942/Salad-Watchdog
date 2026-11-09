@@ -14,25 +14,15 @@
 <body>
 <header class="top">
   <div class="brand"><b></b><span>GPU WATCHDOG</span></div>
-  <div class="pills">
-    <span class="pill" id="p-online"><span class="dot"></span><span>Connecting…</span></span>
-    <span class="pill wide-only" id="p-salad2"></span>
-    <span class="pill wide-only" id="p-game2"></span>
-    <span class="pill wide-only num" id="p-lat2"></span>
-  </div>
+  <button class="btn ghost logs-btn" id="log-more">Logs</button>
 </header>
-<div class="statusrow narrow-only">
-  <span class="pill" id="p-salad"></span>
-  <span class="pill" id="p-game"></span>
-  <span class="pill num" id="p-lat"></span>
-</div>
 
 <div id="banners"></div>
 
 <section class="hero" id="hero">
   <canvas id="hero-canvas" aria-label="Your MSI RTX 5070 Ti, with fans turning at the real fan speed"></canvas>
   <div class="hero-read">
-    <div class="lbl" id="gpu-name">RTX 5070 Ti · GPU temperature</div>
+    <div class="lbl" id="gpu-name">RTX 5070 Ti</div>
     <div class="big num" id="gpu-temp">--<sup>°C</sup></div>
     <div class="mrow num">
       <div><div class="lbl">Load</div><div class="v" id="gpu-util">--</div></div>
@@ -46,7 +36,7 @@
 <main class="main">
   <div class="tiles4">
     <div class="glass tile"><div class="lbl">Core</div><div class="v num" id="t-core">--</div><div id="spark-core"></div></div>
-    <div class="glass tile"><div class="lbl">Hotspot</div><div class="v num" id="t-hot">--</div><div class="s" id="t-hot-note"></div></div>
+    <div class="glass tile"><div class="lbl">Hot Spot</div><div class="v num" id="t-hot">--</div></div>
     <div class="glass tile"><div class="lbl">VRAM</div><div class="v num" id="t-vram">--</div><div class="bar"><i id="t-vram-bar"></i></div></div>
     <div class="glass tile"><div class="lbl">Power</div><div class="v num" id="t-power">--</div></div>
   </div>
@@ -59,26 +49,25 @@
         <div class="right"><div class="lbl">Safety limit</div><div class="num lim" id="safety-limit">--</div></div>
       </div>
       <div id="earn">
-        <div class="lbl" style="margin-top:20px">Balance</div>
+        <div class="lbl" style="margin-top:20px">Salad Balance</div>
         <div class="bal num" id="e-bal">--</div>
         <div class="kv2 num">
-          <div><div class="lbl">Est. next hour</div><div class="v" id="e-next">--</div></div>
           <div><div class="lbl">Last 24 hours</div><div class="v" id="e-24">--</div></div>
+          <div><div class="lbl">Last payout</div><div class="v" id="e-pay">--</div></div>
+          <div><div class="lbl">Est. next hour</div><div class="v" id="e-next">--</div></div>
         </div>
       </div>
-      <div class="gm"><span class="lbl">Game Mode</span><span id="gm-status">--</span></div>
     </section>
 
     <section class="glass card core-card">
-      <div class="sec-h"><h2>Core die</h2><span class="wide-only">Hotspot marker is illustrative, not a physical location</span></div>
+      <div class="sec-h"><h2>Core die</h2></div>
       <div class="corewrap" id="corewrap">
         <img id="core-img" alt="GPU package with the die in the middle" src="">
         <div class="dieglow"></div>
         <svg aria-hidden="true"></svg>
         <div class="co co-core"><div class="lbl">Core</div><div class="t num" id="c-core">--</div></div>
-        <div class="co co-hot"><div class="lbl">Hotspot · max junction</div><div class="t num" id="c-hot">--</div></div>
+        <div class="co co-hot"><div class="lbl">Hot Spot</div><div class="t num" id="c-hot">--</div></div>
       </div>
-      <div class="foot narrow-only">Hotspot marker is illustrative, not a physical location</div>
     </section>
   </div>
 
@@ -95,12 +84,6 @@
   </div>
 
   <div class="row r3">
-    <section class="glass card">
-      <div class="sec-h"><h2>Event log</h2><span>newest first · read-only</span></div>
-      <div id="log"></div>
-      <button class="btn ghost more" id="log-more">Show full history</button>
-    </section>
-
     <section class="glass card" id="controls">
       <div class="sec-h"><h2>Controls</h2><span id="lock-state">🔒 password required</span></div>
       <form class="lockbar" id="lockbar" autocomplete="off">
@@ -112,12 +95,10 @@
         <button class="btn go" data-cmd="salad_chop_now">▶ Chop Now</button>
         <button class="btn" data-cmd="salad_pause">❚❚ Pause</button>
         <button class="btn" data-cmd="salad_off_now">✕ Close Salad</button>
-        <button class="btn" data-cmd="gamemode_set" id="btn-gm">🎮 Game Mode</button>
         <button class="btn" data-cmd="schedule" id="btn-sched">⏱ Schedule off</button>
         <button class="btn danger" data-cmd="pc_off_now">⏻ PC off now</button>
       </div>
       <div class="sched" id="sched-list"></div>
-      <div class="note" id="tz-note"></div>
     </section>
   </div>
   <footer id="foot"></footer>

@@ -22,7 +22,6 @@ nav{width:212px;flex:none;border-right:1px solid var(--line);padding:18px 12px;d
 nav a{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;font-size:13.5px;color:#aeb8c5;cursor:pointer;user-select:none}
 nav a:hover{background:rgba(255,255,255,.03)}
 nav a.on{background:rgba(63,214,255,.09);color:#fff;box-shadow:inset 2px 0 0 var(--cyan)}
-nav a i{font-style:normal;width:18px;text-align:center;opacity:.85}
 nav .foot{margin-top:auto;font-size:11px;color:var(--dim);padding:10px 12px;line-height:1.6}
 main{flex:1;overflow:auto;padding:22px 26px 40px;display:flex;flex-direction:column;gap:16px;min-width:0}
 .h1{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
@@ -123,39 +122,45 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
 .syshead h3{margin:0}.syshead span{display:block;font-size:11.5px;color:var(--dim);margin-top:4px}
 .sysvals{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .sysvals .mv{font-size:26px;margin-top:4px}
+.sysvals>div{min-width:0}.sysvals .lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.statusrow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.statusrow>div{display:flex;flex-direction:column;gap:3px;font-size:13px}.statusrow>div>span:first-child{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);font-weight:600}
+.fold>summary{list-style:none;cursor:pointer}.fold>summary::-webkit-details-marker{display:none}
+.fold>summary h3{margin:0;justify-content:flex-start}.fold>summary h3 span{margin-left:auto}.fold>summary h3::before{content:"▸";display:inline-block;margin-right:8px;transition:transform .15s;color:var(--mute)}
+.fold[open]>summary h3::before{transform:rotate(90deg)}.fold[open]>summary{margin-bottom:12px}
+.loglist{max-height:52vh;overflow:auto}
+.dirty{box-shadow:0 0 0 1px var(--amber) inset}
 </style>
 </head>
 <body>
 <div class="app">
   <nav>
     <div class="brand"><b></b>GPU WATCHDOG</div>
-    <a data-p="monitor" class="on"><i>◉</i>Monitor</a>
-    <a data-p="controls"><i>⏻</i>Controls</a>
-    <a data-p="games"><i>🎮</i>Salad &amp; Game Mode</a>
-    <a data-p="schedules"><i>⏱</i>Schedules</a>
-    <a data-p="safety"><i>⚠</i>Safety &amp; Settings</a>
-    <a data-p="log"><i>≣</i>Event log</a>
-    <div class="foot">Closing this window keeps the watchdog running in the tray.<br><span id="datadir"></span></div>
+    <a data-p="monitor" class="on">Monitor</a>
+    <a data-p="controls">Controls</a>
+    <a data-p="games">Salad &amp; Games</a>
+    <a data-p="schedules">Schedules</a>
+    <a data-p="safety">Safety &amp; Settings</a>
+    <a data-p="log">Logs</a>
   </nav>
   <main id="main">
     <div id="banners" class="stack"></div>
 
     <!-- MONITOR -->
     <section data-page="monitor" class="stack" style="gap:16px">
-      <div class="h1"><h1>Monitor</h1><div class="strip" id="strip"></div></div>
+      <div class="h1"><h1>Monitor</h1></div>
       <div class="glass mon-hero">
         <div class="mh-left">
-          <div class="lbl" id="m-gpuname">GPU temperature</div>
+          <div class="lbl" id="m-gpuname">GPU</div>
           <div class="mbig num" id="m-gpu">--</div>
           <div class="mrow num">
             <div><div class="lbl">Core</div><div class="v" id="m-core">--</div></div>
-            <div><div class="lbl">Hotspot</div><div class="v" id="m-hot">--</div></div>
+            <div><div class="lbl">Hot Spot</div><div class="v" id="m-hot">--</div></div>
             <div><div class="lbl">Load</div><div class="v" id="m-util">--</div></div>
             <div><div class="lbl">Power</div><div class="v" id="m-pow">--</div></div>
             <div><div class="lbl">Fans</div><div class="v" id="m-fan">--</div></div>
             <div><div class="lbl">VRAM</div><div class="v" id="m-vram">--</div><div class="bar"><i id="m-vram-bar"></i></div></div>
           </div>
-          <div class="hs" id="m-hot-note"></div>
         </div>
         <div class="mh-right">
           <canvas id="hero-canvas" aria-label="Your graphics card, fans turning at the real speed"></canvas>
@@ -165,9 +170,9 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
       <div class="g" style="grid-template-columns:1fr 1.45fr;align-items:stretch">
         <div class="glass c"><h3>Salad <span id="m-earn-upd"></span></h3>
           <div class="state" id="m-salad">--</div>
-          <div class="lbl" style="margin-top:14px">Balance</div>
+          <div class="lbl" style="margin-top:14px">Salad Balance</div>
           <div class="bal num" id="m-bal">--</div>
-          <div class="kv num"><div><div class="lbl">Last 24 h</div><div id="m-24" style="color:var(--green)">--</div></div><div><div class="lbl">Last payout</div><div id="m-pay">--</div></div></div>
+          <div class="kv num"><div><div class="lbl">Last 24 h</div><div id="m-24" style="color:var(--green)">--</div></div><div><div class="lbl">Last payout</div><div id="m-pay">--</div></div><div style="grid-column:1/-1"><div class="lbl">Est. next hour</div><div id="m-nh">--</div></div></div>
           <div class="hs" id="m-earn-note"></div>
         </div>
         <div class="glass c sys">
@@ -177,67 +182,55 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
           <div class="sysrow"><div class="syshead"><h3>Storage</h3><span>2 SSDs</span></div><div class="sysvals num" id="m-ssd"></div></div>
         </div>
       </div>
-      <div class="g" style="grid-template-columns:1fr 1.6fr">
-        <div class="glass c"><h3>Status</h3><div id="m-status" class="kvlist"></div></div>
-        <div class="glass c"><h3>Latest events <span><a style="color:var(--cyan);cursor:pointer" data-go="log">Full log →</a></span></h3><div id="m-log"></div></div>
-      </div>
+      <div class="glass c" style="padding:12px 18px"><div id="m-status" class="statusrow"></div></div>
     </section>
 
     <!-- CONTROLS -->
     <section data-page="controls" class="stack hidden" style="gap:16px">
-      <div class="h1"><h1>Controls</h1><div class="strip" id="strip3"></div></div>
-      <div class="g g3">
+      <div class="h1"><h1>Controls</h1></div>
+      <div class="g g3" style="align-items:start">
         <div class="glass c"><h3>Salad <span id="o-hold"></span></h3>
           <button class="btn go" data-cmd="salad_chop_now" style="width:100%;margin-bottom:8px">▶ Start chopping (Chop Now)</button>
           <div class="row2"><button class="btn" data-cmd="salad_pause">❚❚ Pause chopping</button><button class="btn" data-cmd="salad_off_now">✕ Close Salad</button></div>
-          <div class="set" style="margin-top:10px;border-top:1px solid var(--line)"><div>Game Mode<div class="d" id="o-gm"></div></div><button class="tog" data-set="gameModeEnabled"></button></div>
-          <button class="btn small hidden" id="clear-hold" data-cmd="hold_clear" style="width:100%">Clear hold</button>
+          <button class="btn small hidden" id="clear-hold" data-cmd="hold_clear" style="width:100%;margin-top:8px">Clear hold</button>
         </div>
-        <div class="glass c"><h3>PC power <span>no password needed here</span></h3>
+        <div class="glass c"><h3>PC power</h3>
           <button class="btn danger" data-confirm="pc_off_now" style="width:100%;margin-bottom:8px">⏻ Turn PC off now (30 s)</button>
           <div class="row2"><button class="btn" data-go="schedules">⏱ Schedule…</button><button class="btn" data-cmd="shutdown_cancel" id="cancel-sd">Cancel shutdown</button></div>
-          <div style="margin-top:12px;font-size:12px;color:var(--mute)">Scheduled</div><div class="stack" id="o-sched" style="margin-top:7px"></div>
+          <div class="stack" id="o-sched" style="margin-top:8px"></div>
         </div>
         <div class="glass c" style="background:linear-gradient(135deg,rgba(155,140,255,.10),rgba(63,214,255,.04));border-color:rgba(155,140,255,.25)">
-          <h3>Lights &amp; Screen off <span>Salad keeps running</span></h3>
-          <div style="display:flex;gap:16px;align-items:center;min-height:74px">
-            <div class="ring" id="ring"><b class="num" id="ring-n">☾</b></div>
-            <div style="font-size:13px;line-height:1.55" id="lights-text">Turns SignalRGB lighting off now, then the monitors after <span id="delay-txt">20</span> s. The PC stays awake (not sleep).</div>
-          </div>
-          <div class="row2" style="margin-top:14px"><button class="btn violet" data-cmd="lights_off">☾ Lights &amp; Screen Off</button><button class="btn" data-cmd="lights_cancel">Cancel</button></div>
+          <h3>Lights &amp; Screen off <span id="lights-text"></span></h3>
+          <button class="btn violet" data-cmd="lights_off" style="width:100%;margin-bottom:8px">☾ Lights &amp; Screen Off</button><button class="btn" data-cmd="lights_cancel" style="width:100%">Cancel</button>
         </div>
       </div>
-      <div class="glass c"><h3>Recent events <span><a style="color:var(--cyan);cursor:pointer" data-go="log">Full log →</a></span></h3><div id="o-log"></div></div>
     </section>
 
-    <!-- SALAD & GAME MODE -->
+    <!-- SALAD & GAMES -->
     <section data-page="games" class="stack hidden" style="gap:16px">
-      <div class="h1"><h1>Salad &amp; Game Mode</h1><div class="strip" id="strip2"></div></div>
-      <div class="g g2">
-        <div class="glass c"><h3>Game Mode <span>reads the process list only · no hooks</span></h3>
-          <div class="set"><div>Pause chopping while a game runs<div class="d">Chop Now again when all games have closed</div></div><button class="tog" data-set="gameModeEnabled"></button></div>
-          <div class="set"><div>Resume delay after the last game closes</div><div><input class="inp n num" data-num="gameResumeDelaySec"> s</div></div>
-          <div class="set"><div>Import Steam games<div class="d">every Steam library</div></div><button class="tog" data-set="importSteam"></button></div>
-          <div class="set"><div>Import game folders<div class="d">D:\Games, X:\XboxGames, Epic, GOG on every drive</div></div><button class="tog" data-set="importGameFolders"></button></div>
-          <div class="set"><div>Now running</div><div id="g-active" style="color:var(--amber)">no game</div></div>
+      <div class="h1"><h1>Salad &amp; Games</h1></div>
+      <div class="glass c"><h3>Games <span>Salad closes when a game starts and chops again after the last one closes</span></h3>
+        <div class="set"><div>Now running</div><div id="g-active" style="color:var(--amber)">no game</div></div>
+        <div class="set"><div>Chop again after the last game closes</div><div><input class="inp n num" data-num="gameResumeDelaySec"> s</div></div>
+        <div class="set"><div>Import Steam games<div class="d">every Steam library</div></div><button class="tog" data-set="importSteam"></button></div>
+        <div class="set"><div>Import game folders<div class="d">D:\Games, X:\XboxGames, Epic, GOG on every drive</div></div><button class="tog" data-set="importGameFolders"></button></div>
+      </div>
+      <details class="glass c fold" id="g-fold"><summary><h3>Games that pause Salad <span id="g-count"></span></h3></summary>
+        <div class="fold-body">
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><input class="inp" id="g-name" placeholder="Add a game: program name, e.g. KingdomCome.exe" style="flex:2;min-width:220px"><button class="btn small" id="g-add">Add game</button>
+            <select class="inp" id="g-running" style="flex:1;min-width:180px"><option>Add from running programs…</option></select><button class="btn small" id="g-refresh">↻</button></div>
+          <div style="display:flex;gap:8px;margin-top:8px"><input class="inp" id="g-folder" placeholder="Add a game folder, e.g. E:\MyGames" style="flex:1"><button class="btn small" id="g-addfolder">Add folder</button></div>
           <div class="msg" id="g-msg"></div>
+          <div class="stack" id="g-extra" style="margin:6px 0 10px"></div>
+          <input class="inp" id="g-filter" placeholder="Search" style="width:100%;margin-bottom:10px">
+          <div class="list" id="g-list"></div>
         </div>
-        <div class="glass c"><h3>Add a game <span>for programs outside those folders</span></h3>
-          <div style="display:flex;gap:8px"><input class="inp" id="g-name" placeholder="Program name, e.g. KingdomCome.exe" style="flex:1"><button class="btn small" id="g-add">Add</button></div>
-          <div style="display:flex;gap:8px;margin-top:10px"><select class="inp" id="g-running" style="flex:1"><option>Add from running programs…</option></select><button class="btn small" id="g-refresh">↻</button></div>
-          <div style="display:flex;gap:8px;margin-top:10px"><input class="inp" id="g-folder" placeholder="Extra game folder, e.g. E:\MyGames" style="flex:1"><button class="btn small" id="g-addfolder">Add folder</button></div>
-          <div class="stack" id="g-extra" style="margin-top:12px"></div>
-        </div>
-      </div>
-      <div class="glass c"><h3>Games that pause Salad <span id="g-count"></span></h3>
-        <input class="inp" id="g-filter" placeholder="Search" style="width:100%;margin-bottom:10px">
-        <div class="list" id="g-list"></div>
-      </div>
+      </details>
     </section>
 
     <!-- SCHEDULES -->
     <section data-page="schedules" class="stack hidden" style="gap:16px">
-      <div class="h1"><h1>Schedules</h1><span class="pill" id="tz"></span></div>
+      <div class="h1"><h1>Schedules</h1><span style="color:var(--dim);font-size:12px" id="tz"></span></div>
       <div class="g g2">
         <div class="glass c"><h3>New schedule</h3>
           <div class="seg" id="s-action" style="margin-bottom:10px"><button class="on" data-v="pc_off">Turn PC off</button><button data-v="salad_off">Close Salad</button></div>
@@ -254,7 +247,7 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
 
     <!-- SAFETY & SETTINGS -->
     <section data-page="safety" class="stack hidden" style="gap:16px">
-      <div class="h1"><h1>Safety &amp; Settings</h1><span class="pill" id="lock-pill"></span></div>
+      <div class="h1"><h1>Safety &amp; Settings</h1><div style="display:flex;gap:10px;align-items:center"><span class="msg" id="sv-msg"></span><button class="btn small" id="sv-undo">Discard</button><button class="btn go small" id="sv-save" style="min-width:110px">Save</button></div></div>
       <div class="g g2" style="align-items:start">
         <div class="stack" style="gap:16px">
           <div class="glass c" style="border-color:rgba(255,77,94,.25)"><h3>Emergency auto-kill <span>works even with the internet down</span></h3>
@@ -263,7 +256,6 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
             <div class="set"><div>Core limit<div class="d num" id="sf-core-now"></div></div><div><input class="inp n num" data-num="safetyCoreLimitC"> °C</div></div>
             <div class="set"><div>Hotspot limit<div class="d num" id="sf-hot-now"></div></div><div><input class="inp n num" data-num="safetyHotspotLimitC"> °C</div></div>
             <div class="set"><div>Trigger after<div class="d">ignores single glitchy readings</div></div><div><input class="inp n num" data-num="safetySamples"> readings in a row</div></div>
-            <div style="font-size:11.5px;color:var(--dim);margin-top:6px">These can only be changed here on the PC, never from the website.</div>
           </div>
           <div class="glass c"><h3>Lights &amp; Screen</h3>
             <div class="set"><div>Screen-off delay</div><div><input class="inp n num" data-num="screenOffDelaySec"> s</div></div>
@@ -272,7 +264,7 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
           </div>
         </div>
         <div class="stack" style="gap:16px">
-          <div class="glass c"><h3>Website password <span id="pw-sync"></span></h3>
+          <details class="glass c fold"><summary><h3>Website password <span id="pw-sync"></span></h3></summary><div class="fold-body">
             <div class="g g2" style="gap:10px">
               <div><div class="lbl" style="margin-bottom:6px">New password</div><input class="inp" type="password" id="pw1" style="width:100%" autocomplete="new-password"></div>
               <div><div class="lbl" style="margin-bottom:6px">Confirm</div><input class="inp" type="password" id="pw2" style="width:100%" autocomplete="new-password"></div>
@@ -282,7 +274,7 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
               <span style="font-size:11.5px;color:var(--amber)" id="pw-hint">Longer is safer. 6 digits can be guessed by a determined attacker.</span>
               <button class="btn small" id="pw-save">Save &amp; sync</button></div>
             <div class="msg" id="pw-msg"></div>
-          </div>
+          </div></details>
           <div class="glass c"><h3>General</h3>
             <div class="set"><div>Show earnings on the website<div class="d">anyone with the link can see them</div></div><button class="tog" data-set="showEarningsOnWebsite"></button></div>
             <div class="set"><div>Website viewing needs the password<div class="d">off: anyone with the link sees the stats</div></div><button class="tog" data-set="viewRequiresPassword"></button></div>
@@ -295,15 +287,15 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
       </div>
     </section>
 
-    <!-- LOG -->
+    <!-- LOGS -->
     <section data-page="log" class="stack hidden" style="gap:16px">
-      <div class="h1"><h1>Event log</h1><div class="strip"><button class="btn small" data-cmd="open_log">Open log file</button></div></div>
+      <div class="h1"><h1>Logs</h1><button class="btn small" data-cmd="open_log">Open log folder</button></div>
       <div class="glass c">
         <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-          <input class="inp" id="l-q" placeholder="Search the log" style="flex:1;min-width:200px">
-          <div class="seg" id="l-f"><button class="on" data-v="all">All</button><button data-v="info">Info</button><button data-v="warn">Warnings</button><button data-v="error">Errors</button></div>
+          <div class="seg" id="l-cat"><button class="on" data-v="pc">PC status</button><button data-v="salad">Salad</button><button data-v="earnings">Earnings</button></div>
+          <input class="inp" id="l-q" placeholder="Search" style="flex:1;min-width:180px">
         </div>
-        <div id="l-list"></div>
+        <div id="l-list" class="loglist"></div>
         <button class="btn small" id="l-more" style="width:100%;margin-top:10px">Load older</button>
       </div>
     </section>
@@ -327,7 +319,8 @@ const fmtT = t => new Date(t * 1000).toLocaleString([], { weekday: "short", hour
 const LABEL = { not_running: "Not running", idle: "Idle / waiting", paused: "Paused", chopping: "Chopping", locked_out: "Locked out", unknown: "Checking…" };
 
 // ---------- navigation ----------
-function go(p) { page = p; document.querySelectorAll("nav a").forEach(a => a.classList.toggle("on", a.dataset.p === p));
+function go(p) { if (page === "safety" && p !== "safety" && Object.keys(P).length) { P = {}; flash("Settings not saved: changes discarded.", false); }
+  page = p; document.querySelectorAll("nav a").forEach(a => a.classList.toggle("on", a.dataset.p === p));
   document.querySelectorAll("[data-page]").forEach(s => s.classList.toggle("hidden", s.dataset.page !== p));
   if (p === "log") loadLog(true); if (p === "games") loadLibrary(); }
 document.querySelectorAll("nav a").forEach(a => a.onclick = () => go(a.dataset.p));
@@ -349,14 +342,30 @@ document.addEventListener("click", async e => {
   const el = e.target.closest("[data-cmd],[data-confirm],[data-go],[data-set],[data-cancel]"); if (!el) return;
   if (el.dataset.go) return go(el.dataset.go);
   if (el.dataset.cancel) return cmd("schedule_cancel", { id: el.dataset.cancel });
-  if (el.dataset.set) return setSetting({ [el.dataset.set]: !el.classList.contains("on") });
+  if (el.dataset.set) { if (inSafety(el)) { P[el.dataset.set] = !el.classList.contains("on"); return renderSettings(); } return setSetting({ [el.dataset.set]: !el.classList.contains("on") }); }
   if (el.dataset.confirm === "pc_off_now") { if (await confirmBox("Turn the PC off?", "<p>Windows shuts down after a 30-second countdown; you can cancel it. Salad stops earning, and the PC can't be turned back on remotely.</p>", "⏻ Turn off")) cmd("pc_off_now"); return; }
   cmd(el.dataset.cmd);
 });
 async function setSetting(o, out) { const r = await api("/api/cmd", { cmd: "settings_set", args: o }); if (out) { out.textContent = r.msg; out.className = "msg ok"; } refresh(); }
-document.querySelectorAll("[data-num]").forEach(i => i.addEventListener("change", () => setSetting({ [i.dataset.num]: Number(i.value) })));
-document.querySelectorAll("[data-text]").forEach(i => i.addEventListener("change", () => setSetting({ [i.dataset.text]: i.value })));
-$("sf-sensor").onclick = e => { if (e.target.dataset.v) setSetting({ safetySensor: e.target.dataset.v }); };
+// Safety & Settings: changes wait for the Save button; leaving the tab discards them
+let P = {};
+const inSafety = el => !!el.closest('[data-page="safety"]');
+const val = k => k in P ? P[k] : S?.settings[k];
+document.querySelectorAll("[data-num]").forEach(i => i.addEventListener(inSafety(i) ? "input" : "change", () => { if (inSafety(i)) { P[i.dataset.num] = Number(i.value); renderSettings(); } else setSetting({ [i.dataset.num]: Number(i.value) }); }));
+document.querySelectorAll("[data-text]").forEach(i => i.addEventListener("input", () => { P[i.dataset.text] = i.value; renderSettings(); }));
+$("sf-sensor").onclick = e => { if (e.target.dataset.v) { P.safetySensor = e.target.dataset.v; renderSettings(); } };
+$("sv-save").onclick = async () => { if (!Object.keys(P).length) return; const o = P; P = {}; await setSetting(o); flash("Settings saved.", true); };
+$("sv-undo").onclick = () => { P = {}; renderSettings(); };
+function renderSettings() {
+  if (!S) return; const st = S.settings, n = Object.keys(P).length;
+  document.querySelectorAll("[data-set]").forEach(x => x.classList.toggle("on", !!val(x.dataset.set)));
+  document.querySelectorAll("[data-num]").forEach(x => { if (document.activeElement !== x) x.value = val(x.dataset.num); });
+  document.querySelectorAll("[data-text]").forEach(x => { if (document.activeElement !== x) x.value = val(x.dataset.text) || ""; });
+  document.querySelectorAll('[data-page="safety"] [data-set],[data-page="safety"] [data-num],[data-page="safety"] [data-text]').forEach(x => { const k = x.dataset.set || x.dataset.num || x.dataset.text; x.classList.toggle("dirty", k in P && P[k] !== st[k]); });
+  $("sf-sensor").querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.v === val("safetySensor")));
+  $("sv-msg").textContent = n ? "Unsaved changes" : ""; $("sv-msg").className = "msg" + (n ? " bad" : "");
+  $("sv-save").disabled = !n; $("sv-undo").classList.toggle("hidden", !n);
+}
 
 // ---------- render ----------
 async function refresh() {
@@ -368,34 +377,23 @@ async function refresh() {
   // banners (lockout, old watchdog, sensors)
   const b = [];
   if (S.lockout) b.push(`<div class="banner red"><b>⚠ Salad locked out at ${Math.round(S.lockout.tempC)} °C · ${fmtT(S.lockout.at)}</b>The GPU ${esc(S.lockout.sensor)} reached the safety limit, so Salad was force-closed and kept closed. Check the fans, dust and airflow before allowing it again.<br><button class="btn" id="clear-lock">I checked the PC (fans, dust, airflow), allow Salad again</button></div>`);
-  if (S.oldWatchdog) b.push(`<div class="banner amber"><b>The old GPU Watchdog is running</b>Two watchdogs would fight over Salad. Close the old one from its tray icon (right-click → Exit). Game Mode waits until then.</div>`);
+  if (S.oldWatchdog) b.push(`<div class="banner amber"><b>The old GPU Watchdog is running</b>Two watchdogs would fight over Salad. Close the old one from its tray icon (right-click → Exit).</div>`);
   if (t.safety.sensorFail) b.push(`<div class="banner amber"><b>GPU temperature can't be read</b>The safety stop won't act on missing data.</div>`);
   if (!st.relayUrl) b.push(`<div class="banner amber"><b>Website not set up yet</b>Everything works on this PC; the website connection is added during setup.</div>`);
   const keep = [...$("banners").children].filter(x => !x.dataset.fixed);
   $("banners").innerHTML = b.map(x => x.replace('<div class="banner', '<div data-fixed="1" class="banner')).join(""); keep.forEach(k => $("banners").prepend(k));
   if ($("clear-lock")) $("clear-lock").onclick = clearLockout;
 
-  const strip = `<span class="pill"><span class="dot ${S.relay.connected ? "on" : ""}"></span>${S.relay.connected ? `Website connected · ${S.relay.viewers} watching` : "Website not connected"}</span>
-    <span class="pill ${s.state === "chopping" ? "salad" : s.state === "locked_out" ? "bad" : ""}">● Salad ${esc(LABEL[s.state] || s.state).toLowerCase()}${s.hold && s.state !== "locked_out" ? " · hold" : ""}</span>
-    <span class="pill">🎮 ${!s.gameMode.enabled ? "Game Mode off" : s.gameMode.activeGame ? "Paused for " + esc(s.gameMode.activeGame) : "Waiting for a game"}</span>
-    <span class="pill">${S.password.synced ? '<span style="color:var(--green)">✔</span> Password synced' : "⏳ Password pending sync"}</span>`;
-  $("strip").innerHTML = strip; $("strip2").innerHTML = strip; $("strip3").innerHTML = strip;
-
   renderMonitor(S);
 
   $("o-hold").textContent = s.state === "locked_out" ? "locked out" : s.hold ? "hold active" : "no hold";
   $("clear-hold").classList.toggle("hidden", !s.hold || s.state === "locked_out");
   document.querySelectorAll('[data-cmd="salad_chop_now"]').forEach(x => x.disabled = s.state === "locked_out");
-  $("o-gm").textContent = `Pauses for games, Chop Now ${st.gameResumeDelaySec} s after the last one closes`;
-  document.querySelectorAll("[data-set]").forEach(x => x.classList.toggle("on", !!st[x.dataset.set]));
-  document.querySelectorAll("[data-num]").forEach(x => { if (document.activeElement !== x) x.value = st[x.dataset.num]; });
-  document.querySelectorAll("[data-text]").forEach(x => { if (document.activeElement !== x) x.value = st[x.dataset.text] || ""; });
-  $("sf-sensor").querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.v === st.safetySensor));
+  renderSettings();
   $("sf-core-now").textContent = isNum(g.coreC) ? `now ${Math.round(g.coreC)} °C` : "now N/A";
   $("sf-hot-now").textContent = isNum(g.hotspotC) ? `now ${Math.round(g.hotspotC)} °C` : "N/A on this card";
-  $("lock-pill").innerHTML = S.lockout ? '<span class="dot" style="background:var(--red)"></span>Lockout: ACTIVE' : '<span class="dot on"></span>Lockout: not active';
   $("cancel-sd").disabled = !t.shutdown.pendingAt;
-  $("datadir").textContent = "Data: " + st.dataFolder; $("dataloc").textContent = st.dataFolder;
+  $("dataloc").textContent = st.dataFolder;
   $("pw-sync").innerHTML = S.password.synced ? '<span style="color:var(--green)">✔ synced to website</span>' : "⏳ pending sync";
   $("tz").textContent = "PC time zone: " + t.pc.tz;
   $("g-active").textContent = S.games.active.length ? S.games.active.join(", ") : "no game";
@@ -404,15 +402,9 @@ async function refresh() {
   $("o-sched").innerHTML = sched || `<div style="color:var(--dim);font-size:12.5px">None</div>`;
   $("s-list").innerHTML = sched || `<div style="color:var(--dim);font-size:12.5px">Nothing scheduled.</div>`;
 
-  // lights countdown ring
+  // lights countdown
   const left = S.lights.screenOffAt ? Math.max(0, S.lights.screenOffAt - Math.floor(Date.now() / 1000)) : 0;
-  $("ring").style.background = left ? `conic-gradient(var(--violet) 0 ${100 - left / st.screenOffDelaySec * 100}%, rgba(255,255,255,.08) 0)` : "rgba(255,255,255,.06)";
-  $("ring-n").textContent = left ? left : "☾";
-  $("lights-text").innerHTML = left ? `${esc(S.lights.last)}<br>Screen turns off in <b>${left} s</b><br><span style="color:var(--dim);font-size:11.5px">PC stays awake — not sleep</span>`
-    : `Turns SignalRGB lighting off now, then the monitors after ${st.screenOffDelaySec} s. The PC stays awake (not sleep).`;
-
-  // recent log
-  if (page === "monitor" || page === "controls") { const l = await api("/api/log"); $("o-log").innerHTML = l.events.slice(0, 6).map(row).join(""); $("m-log").innerHTML = l.events.slice(0, 5).map(row).join(""); }
+  $("lights-text").innerHTML = left ? `<b style="color:#c9c0ff">screen off in ${left} s</b>` : "";
   $("g-extra").innerHTML = S.games.extra.map(n => `<div class="li"><span>${esc(n)}.exe <small>added by you</small></span><button class="chip" data-rm="${esc(n)}">✕</button></div>`).join("")
     + S.games.folders.map(n => `<div class="li"><span>${esc(n)} <small>folder</small></span><button class="chip" data-rmf="${esc(n)}">✕</button></div>`).join("");
 }
@@ -450,23 +442,24 @@ function renderMonitor(S) {
   const t = S.telemetry, g = t.gpu, s = t.salad, f = g.fans?.[0];
   if (hero) hero.set({ rpm: (g.fans || []).map(x => isNum(x.rpm) ? x.rpm : isNum(x.pct) ? x.pct * 30 : 0), tempC: g.tempC, online: true });
   if (t.t !== lastT) { lastT = t.t; push(H.gpu, g.tempC); push(H.cpu, t.cpu.tempC); push(H.ram, Math.max(...t.ram.map(r => r.tempC ?? -99))); push(H.ssd, Math.max(...t.ssd.map(r => r.tempC ?? -99))); }
-  $("m-gpuname").textContent = (g.name || "GPU").replace("NVIDIA GeForce ", "") + " · GPU temperature";
+  $("m-gpuname").textContent = (g.name || "GPU").replace("NVIDIA GeForce ", "");
   $("m-gpu").innerHTML = isNum(g.tempC) ? `${Math.round(g.tempC)}<sup>°C</sup>` : "N/A"; $("m-gpu").className = "mbig num " + tc(g.tempC);
   $("m-core").innerHTML = `<span class="${tc(g.coreC)}">${deg(g.coreC)}</span>`;
   $("m-hot").innerHTML = `<span class="${tc(g.hotspotC)}">${deg(g.hotspotC)}</span>`;
   $("m-util").innerHTML = isNum(g.util) ? `${g.util}<small>%</small>` : "N/A";
   $("m-pow").innerHTML = W(g.powerW);
-  $("m-fan").innerHTML = f && isNum(f.pct) ? `${f.pct}<small>%${isNum(f.rpm) ? " · " + Math.round(f.rpm).toLocaleString() + " rpm" : ""}</small>` : "N/A";
+  $("m-fan").innerHTML = f && isNum(f.pct) ? `${f.pct}<small>%</small>` : "N/A";
   $("m-vram").innerHTML = isNum(g.vramUsedMB) ? `${(g.vramUsedMB / 1024).toFixed(1)}<small> / ${Math.round(g.vramTotalMB / 1024)} GB</small>` : "N/A";
   $("m-vram-bar").style.width = isNum(g.vramUsedMB) ? (g.vramUsedMB / g.vramTotalMB * 100) + "%" : "0";
-  $("m-hot-note").textContent = isNum(g.hotspotC) ? "" : "Hotspot: start HWiNFO (with Shared Memory Support) or GPU-Z and it appears here automatically.";
-  $("m-limit").textContent = `Safety limit ${t.safety.limitC} °C (${t.safety.sensor})${t.safety.enabled ? "" : " · OFF"}`;
+  $("m-limit").textContent = `Safety limit ${t.safety.limitC} °C${t.safety.enabled ? "" : " · OFF"}`;
   $("m-salad").textContent = (LABEL[s.state] || s.state) + (s.hold && s.state !== "locked_out" ? " · hold" : ""); $("m-salad").className = "state " + s.state;
   const e = s.earnings;
   $("m-bal").textContent = e && isNum(e.balanceUSD) ? "$" + e.balanceUSD.toFixed(4) : "N/A";
   const pmin = e && e.lastPayoutAt ? Math.max(0, Math.round((Date.now() / 1000 - e.lastPayoutAt) / 60)) : null;
   $("m-pay").innerHTML = e && isNum(e.lastPayoutUSD) ? `+$${e.lastPayoutUSD.toFixed(4)} <span style="color:var(--dim);font-weight:400;font-size:12.5px">· ${pmin < 1 ? "just now" : pmin < 60 ? pmin + " min ago" : Math.floor(pmin / 60) + " h " + (pmin % 60) + " min ago"}</span>` : "N/A";
   $("m-24").textContent = e && isNum(e.last24hUSD) ? (e.last24hUSD >= 0 ? "+" : "−") + "$" + Math.abs(e.last24hUSD).toFixed(4) : "N/A";
+  const nhAgo = e && e.nextHourAt ? Math.round((Date.now() / 1000 - e.nextHourAt) / 60) : null;
+  $("m-nh").innerHTML = e && isNum(e.estNextHourHighUSD) ? `$${e.estNextHourLowUSD.toFixed(3)} – $${e.estNextHourHighUSD.toFixed(3)} <span style="color:var(--dim);font-weight:400;font-size:12.5px">· read ${nhAgo < 1 ? "just now" : nhAgo + " min ago"}</span>` : `<span style="color:var(--dim);font-weight:400;font-size:12.5px">read from Salad when you're away from the PC</span>`;
   const ago = e && e.updatedAt ? Math.round((Date.now() / 1000 - e.updatedAt) / 60) : null;
   $("m-earn-upd").textContent = ago == null ? "" : ago < 1 ? "updated just now" : `updated ${ago} min ago`;
   $("m-earn-note").textContent = S.earningsStatus && S.earningsStatus !== "OK" ? S.earningsStatus + (e ? " Showing the last values read." : "") : e && !isNum(e.lastPayoutUSD) ? "Last payout appears the next time Salad adds to your balance." : "";
@@ -479,10 +472,10 @@ function renderMonitor(S) {
   const next = t.schedules.filter(x => !x.missed)[0];
   $("m-status").innerHTML = [
     ["Website", S.relay.connected ? `connected · ${S.relay.viewers} watching` : "not connected"],
-    ["Game Mode", !s.gameMode.enabled ? "off" : s.gameMode.activeGame ? "paused for " + esc(s.gameMode.activeGame) : "waiting for a game"],
+    ["Games", s.gameMode.activeGame ? esc(s.gameMode.activeGame) + " running" : "none running"],
     ["Safety stop", S.lockout ? '<b style="color:var(--red)">LOCKED OUT</b>' : t.safety.enabled ? `on · ${t.safety.limitC} °C` : '<span style="color:var(--amber)">off</span>'],
     ["Next schedule", next ? (next.action === "pc_off" ? "PC off · " : "Close Salad · ") + fmtT(next.at) : "none"],
-    ["Shutdown", t.shutdown.pendingAt ? `<b style="color:var(--red)">in ${Math.max(0, t.shutdown.pendingAt - Math.floor(Date.now() / 1000))} s</b>` : "none pending"],
+    ...(t.shutdown.pendingAt ? [["Shutdown", `<b style="color:var(--red)">in ${Math.max(0, t.shutdown.pendingAt - Math.floor(Date.now() / 1000))} s</b>`]] : []),
   ].map(([k, v]) => `<div><span>${k}</span><span>${v}</span></div>`).join("");
 }
 
@@ -518,14 +511,15 @@ $("pw1").oninput = () => { const n = pwStr($("pw1").value), col = ["", "#ff4d5e"
 $("pw-save").onclick = async () => { if ($("pw1").value !== $("pw2").value) { $("pw-msg").textContent = "The two passwords don't match."; $("pw-msg").className = "msg bad"; return; }
   await cmd("password_set", { password: $("pw1").value }, $("pw-msg")); $("pw1").value = $("pw2").value = ""; $("pw1").oninput(); };
 
-// ---------- log page ----------
-let LOG = [], logMore = false, lf = "all";
-async function loadLog(reset) { const before = reset || !LOG.length ? "" : LOG.at(-1).t; const r = await api("/api/log" + (before ? "?before=" + before : ""));
+// ---------- logs ----------
+let LOG = [], logMore = false, lcat = "pc";
+async function loadLog(reset) { const before = reset || !LOG.length ? "" : LOG.at(-1).t; const r = await api("/api/log?cat=" + lcat + (before ? "&before=" + before : ""));
   LOG = reset ? r.events : LOG.concat(r.events); logMore = r.more; drawLog(); }
-function drawLog() { const q = $("l-q").value.toLowerCase(); const rows = LOG.filter(e => (lf === "all" || e.level === lf) && (!q || e.msg.toLowerCase().includes(q)));
-  $("l-list").innerHTML = rows.map(row).join("") || `<div style="color:var(--dim)">Nothing matches.</div>`; $("l-more").classList.toggle("hidden", !logMore); }
+function drawLog() { const q = $("l-q").value.toLowerCase(); const rows = LOG.filter(e => !q || e.msg.toLowerCase().includes(q));
+  $("l-list").innerHTML = rows.map(row).join("") || `<div style="color:var(--dim)">Nothing here yet.</div>`; $("l-more").classList.toggle("hidden", !logMore); }
 $("l-q").oninput = drawLog; $("l-more").onclick = () => loadLog(false);
-$("l-f").onclick = e => { if (!e.target.dataset.v) return; lf = e.target.dataset.v; $("l-f").querySelectorAll("button").forEach(b => b.classList.toggle("on", b === e.target)); drawLog(); };
+$("l-cat").onclick = e => { if (!e.target.dataset.v) return; lcat = e.target.dataset.v; $("l-cat").querySelectorAll("button").forEach(b => b.classList.toggle("on", b === e.target)); loadLog(true); };
+setInterval(() => { if (page === "log" && !$("l-q").value && $("l-list").scrollTop < 5) loadLog(true); }, 10000);
 
 refresh(); setInterval(refresh, 1000);
 </script>

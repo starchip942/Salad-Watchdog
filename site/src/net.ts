@@ -105,10 +105,10 @@ export async function command(cmd: string, args: Record<string, unknown> = {}): 
   } catch { return { ok: false, msg: "Can't reach the relay." }; }
 }
 
-export async function olderEvents(before: number): Promise<{ events: LogEvent[]; more: boolean }> {
-  if (DEMO) return demoOlder(before);
+export async function olderEvents(before: number, cat: string): Promise<{ events: LogEvent[]; more: boolean }> {
+  if (DEMO) return demoOlder(before, cat);
   const tok = tokenNow();
-  const r = await fetch(`${RELAY}/events?before=${before}&limit=100`, { headers: tok ? { authorization: "Bearer " + tok } : {} });
+  const r = await fetch(`${RELAY}/events?before=${before}&limit=100&cat=${encodeURIComponent(cat)}`, { headers: tok ? { authorization: "Bearer " + tok } : {} });
   return r.json();
 }
 
@@ -124,17 +124,17 @@ function startDemo(h: Handlers) {
     cpu: { name: "CPU", tempC: 52, powerW: 46 },
     ram: [{ name: "DIMM 1", tempC: 44 }, { name: "DIMM 2", tempC: 45 }],
     ssd: [{ name: "SSD 1", tempC: 41 }, { name: "SSD 2", tempC: 38 }],
-    salad: { state: "chopping", hold: false, gameMode: { enabled: true, activeGame: null },
-      earnings: { balanceUSD: 3.4731, estNextHourLowUSD: 0.1177, estNextHourHighUSD: 0.2486, last24hUSD: 3.0407, updatedAt: now - 60 } },
+    salad: { state: "chopping", hold: false, gameMode: { activeGame: null },
+      earnings: { balanceUSD: 3.4731, estNextHourLowUSD: 0.1177, estNextHourHighUSD: 0.2486, last24hUSD: 3.0407, updatedAt: now - 60, lastPayoutUSD: 0.0213, lastPayoutAt: now - 600, nextHourAt: now - 240 } },
     safety: { limitC: 85, sensor: "core", lockout: null },
     shutdown: { pendingAt: null },
     schedules: [],
   };
   const hist: HistPoint[] = [];
   for (let i = 300; i > 0; i--) hist.push({ t: now - i, g: [64 + Math.sin(i / 17) * 2 + Math.random(), null, 97, 240 + Math.random() * 15, 58], c: [50 + Math.sin(i / 9) * 3, 44 + Math.random() * 5], r: [44, 45], d: [41, 38] });
-  const msgs = ["Agent started · 9 sensors OK, 1 N/A (hotspot)", "Relay connected", "Kingdom Come: Deliverance II started → pausing chopping", "Kingdom Come: Deliverance II closed, waiting 10 s", "All games closed → Chop Now", "Earnings read: balance $3.4731"];
+  const msgs: [string, string][] = [["pc", "64°C average (peak 68°C)"], ["salad", "Kingdom Come: Deliverance II started (KingdomCome.exe); Salad closed."], ["salad", "Games closed → Salad chopping again."], ["earnings", "Payout +$0.0213 → balance $3.4731"], ["pc", "Watchdog started."], ["salad", "Salad: idle → chopping."]];
   const events: LogEvent[] = [];
-  for (let i = 0; i < 140; i++) events.push({ id: "d" + i, t: now - (140 - i) * 600, level: i % 23 === 5 ? "warn" : "info", msg: msgs[i % msgs.length] });
+  for (let i = 0; i < 140; i++) { const [cat, msg] = msgs[i % msgs.length]; events.push({ id: "d" + i, t: now - (140 - i) * 600, level: i % 23 === 5 ? "warn" : "info", msg, cat }); }
   demoEvents = events;
   h.hello({ online: true, lastSeen: Date.now(), last: demoT, history: hist, events: events.slice(-50).reverse(), eventsTotal: events.length });
   h.link("open", 42);
@@ -155,20 +155,19 @@ function startDemo(h: Handlers) {
   }, 1000);
 }
 let demoEvents: LogEvent[] = [];
-function demoOlder(before: number) {
-  const older = demoEvents.filter(e => e.t < before);
+function demoOlder(before: number, cat: string) {
+  const older = demoEvents.filter(e => e.t < before && e.cat === cat);
   return Promise.resolve({ events: older.slice(-100).reverse(), more: older.length > 100 });
 }
 function demoCommand(cmd: string, args: Record<string, unknown>) {
   const s = demoT.salad;
   const now = Math.floor(Date.now() / 1000);
-  const ev = (msg: string) => demoH.event({ id: "x" + Math.random(), t: now, level: "info", msg });
+  const ev = (msg: string) => demoH.event({ id: "x" + Math.random(), t: now, level: "info", msg, cat: "salad" });
   let msg = "Done.";
   switch (cmd) {
     case "salad_chop_now": s.state = "chopping"; s.hold = false; msg = "Salad is chopping."; break;
     case "salad_pause": s.state = "paused"; s.hold = true; msg = "Chopping paused. Salad stays open."; break;
     case "salad_off_now": s.state = "not_running"; s.hold = true; msg = "Salad closed."; break;
-    case "gamemode_set": s.gameMode.enabled = !!args.enabled; msg = `Game Mode ${args.enabled ? "on" : "off"}.`; break;
     case "pc_off_now": demoT.shutdown = { pendingAt: now + 30 }; msg = "Shutting down in 30 s."; break;
     case "shutdown_cancel": demoT.shutdown = { pendingAt: null }; msg = "Shutdown cancelled."; break;
     case "schedule_add": {

@@ -101,12 +101,11 @@ function render() {
   tween($("gpu-util"), g.util, unit("%"));
   tween($("gpu-power"), g.powerW, unit(" W"));
   const fan = g.fans?.[0];
-  tween($("gpu-fans"), fan?.pct ?? null, v => `${Math.round(v)}<small>%${isNum(fan?.rpm) ? ` · ${Math.round(fan!.rpm!).toLocaleString()} rpm` : ""}</small>`);
+  tween($("gpu-fans"), fan?.pct ?? null, v => `${Math.round(v)}<small>%</small>`);
   spark($("spark-gpu"), last5min(h => h.g[0]), tempColor(g.tempC), 44);
 
   const core = $("t-core"); tween(core, g.coreC, deg()); core.className = "v num " + tempClass(g.coreC);
   const hot = $("t-hot"); tween(hot, g.hotspotC, deg()); hot.className = "v num " + tempClass(g.hotspotC);
-  $("t-hot-note").textContent = isNum(g.hotspotC) ? "max junction temperature" : "This card's driver doesn't report it";
   spark($("spark-core"), last5min(h => h.g[0]), tempColor(g.coreC));
   tween($("t-vram"), isNum(g.vramUsedMB) ? g.vramUsedMB / 1024 : null, v => `${v.toFixed(1)}<small>/ ${isNum(g.vramTotalMB) ? Math.round(g.vramTotalMB / 1024) : "?"} GB</small>`);
   $("t-vram-bar").style.width = isNum(g.vramUsedMB) && isNum(g.vramTotalMB) ? (g.vramUsedMB / g.vramTotalMB * 100) + "%" : "0";
@@ -132,23 +131,20 @@ function render() {
   if (s.hold && s.state !== "locked_out") st.textContent += " · hold";
   st.className = "state " + s.state;
   const sf = t.safety;
-  $("safety-limit").innerHTML = sf ? `${sf.limitC} °C <small>${sf.sensor === "either" ? "core / hotspot" : sf.sensor}</small>` : "--";
+  $("safety-limit").innerHTML = sf ? `${sf.limitC} °C` : "--";
   const e = s.earnings;
   $("earn").classList.toggle("hidden", !e);
   if (e) {
     $("e-bal").textContent = usd4(e.balanceUSD);
-    $("e-next").textContent = range3(e.estNextHourLowUSD, e.estNextHourHighUSD);
+    const nhAge = e.nextHourAt ? Date.now() / 1000 - e.nextHourAt : null;
+    $("e-next").innerHTML = isNum(e.estNextHourHighUSD) ? `${range3(e.estNextHourLowUSD, e.estNextHourHighUSD)} <small>· ${nhAge != null ? ago(nhAge) : ""}</small>` : `<small>read while you're away from the PC</small>`;
+    $("e-pay").innerHTML = isNum(e.lastPayoutUSD ?? null) ? `+$${e.lastPayoutUSD!.toFixed(4)} <small>· ${e.lastPayoutAt ? ago(Date.now() / 1000 - e.lastPayoutAt) : ""}</small>` : "N/A";
     const l24 = $("e-24"); l24.textContent = usd4(e.last24hUSD, true); l24.style.color = isNum(e.last24hUSD) ? "var(--green)" : "";
     $("salad-updated").textContent = e.updatedAt ? "updated " + ago(Date.now() / 1000 - e.updatedAt) : "earnings not read yet";
   } else $("salad-updated").textContent = "";
-  $("gm-status").innerHTML = !s.gameMode.enabled ? "Off" : s.gameMode.activeGame ? `On · paused for <b>${esc(s.gameMode.activeGame)}</b>` : "On · waiting for a game";
-  const gmBtn = $("btn-gm");
-  gmBtn.textContent = `🎮 Game Mode: ${s.gameMode.enabled ? "On" : "Off"}`;
-  gmBtn.classList.toggle("on", s.gameMode.enabled);
   (document.querySelector('[data-cmd="salad_chop_now"]') as HTMLButtonElement).disabled = s.state === "locked_out";
 
   renderSchedules();
-  $("tz-note").innerHTML = `PC time zone: ${esc(tz() ?? "unknown")}${t.pc ? ` (UTC${t.pc.tzOffsetMin >= 0 ? "+" : "−"}${Math.abs(t.pc.tzOffsetMin / 60)})` : ""}.<br>Once the PC is off, it can't be turned back on from this website.`;
 
   hero.set({ rpm: (g.fans ?? []).map(f => isNum(f.rpm) ? f.rpm : isNum(f.pct) ? f.pct * 30 : 0), tempC: g.tempC, online: S.online });
 }
@@ -167,19 +163,7 @@ function renderPair(id: string, list: { name: string; tempC: Num }[], kind: "ram
   });
 }
 
-function renderStatus() {
-  const on = $("p-online");
-  const since = (Date.now() - S.lastSeen) / 1000;
-  if (S.link !== "open") on.innerHTML = `<span class="dot wait"></span>${S.link === "connecting" ? "Connecting…" : "Reconnecting…"}`;
-  else if (S.online) on.innerHTML = `<span class="dot on"></span>Online · ${since < 3 ? "live" : ago(since)}`;
-  else on.innerHTML = `<span class="dot"></span>Offline${S.lastSeen ? " since " + pcTime(S.lastSeen / 1000, tz(), since > 20 * 3600) : ""}`;
-  const s = S.t?.salad;
-  const saladTxt = s ? `● Salad ${SALAD_LABEL[s.state]?.toLowerCase() ?? s.state}` : "";
-  const gm = s ? (s.gameMode.enabled ? (s.gameMode.activeGame ? `🎮 Paused for ${s.gameMode.activeGame}` : "🎮 Waiting for a game") : "🎮 Game Mode off") : "";
-  for (const id of ["p-salad", "p-salad2"]) { const el = $(id); el.textContent = saladTxt; el.className = "pill " + (s?.state === "chopping" ? "salad" : s?.state === "locked_out" ? "bad" : "") + (id.endsWith("2") ? " wide-only" : ""); }
-  for (const id of ["p-game", "p-game2"]) $(id).textContent = gm;
-  for (const id of ["p-lat", "p-lat2"]) $(id).textContent = S.latency != null && S.link === "open" ? `${S.latency} ms` : "";
-}
+function renderStatus() { /* status pills removed: the banners say when the PC is offline */ }
 
 function renderBanners() {
   const t = S.t, out: string[] = [];
@@ -202,44 +186,43 @@ function renderSchedules() {
   $("sched-list").innerHTML = list.map(s => `<div class="sched-item"><span>${s.action === "pc_off" ? "Turn PC off" : "Close Salad"} · ${pcTime(s.at, tz(), true)}${s.missed ? " · missed" : ""}</span><button class="x" data-cancel="${esc(s.id)}" aria-label="Cancel this schedule">✕</button></div>`).join("");
 }
 
-// ---------------- event log ----------------
+// ---------------- logs (three separate logs, in a sheet) ----------------
 const logRow = (e: LogEvent) => `<div class="log-row"><span class="tm num">${logTime(e.t, tz())}</span><span class="lv ${esc(e.level)}">${e.level === "error" ? "ERR" : esc(e.level)}</span><span>${esc(e.msg)}</span></div>`;
-function renderLog() {
-  const n = isWide() ? 8 : 6;
-  $("log").innerHTML = S.events.length ? S.events.slice(0, n).map(logRow).join("") : `<div class="empty">No events yet.</div>`;
-  $("log-more").textContent = `Show full history${S.eventsTotal > n ? ` (${S.eventsTotal})` : ""}`;
-}
-
-let sheetEvents: LogEvent[] = [], sheetMore = true, filter = "all", query = "";
+function renderLog() { /* the logs live in their own sheet */ }
+const CATS: [string, string][] = [["pc", "PC status"], ["salad", "Salad"], ["earnings", "Earnings"]];
+const catOf = (e: LogEvent) => e.cat ?? "pc";
+let sheetEvents: LogEvent[] = [], sheetMore = true, cat = "pc", query = "";
 async function openLogSheet() {
-  sheetEvents = [...S.events]; sheetMore = S.eventsTotal > S.events.length; filter = "all"; query = "";
-  openSheet("Event log", `
-    <input class="search" id="log-q" placeholder="Search the log" aria-label="Search the log">
-    <div class="filters">${["all", "info", "warn", "error"].map(f => `<button class="chip ${f === "all" ? "on" : ""}" data-f="${f}">${f === "all" ? "All" : f === "warn" ? "Warnings" : f === "error" ? "Errors" : "Info"}</button>`).join("")}</div>
+  query = "";
+  openSheet("Logs", `
+    <div class="filters">${CATS.map(([k, l]) => `<button class="chip ${k === cat ? "on" : ""}" data-c="${k}">${l}</button>`).join("")}</div>
+    <input class="search" id="log-q" placeholder="Search" aria-label="Search the log">
     <div class="loglist" id="loglist"></div>
     <button class="btn ghost more" id="log-older">Load older</button>`);
+  const pick = () => { sheetEvents = S.events.filter(e => catOf(e) === cat); sheetMore = true; };
   const draw = () => {
-    const rows = sheetEvents.filter(e => (filter === "all" || e.level === filter) && (!query || e.msg.toLowerCase().includes(query)));
-    $("loglist").innerHTML = rows.length ? rows.map(logRow).join("") : `<div class="empty">Nothing matches.</div>`;
-    const b = $<HTMLButtonElement>("log-older"); b.style.display = sheetMore ? "" : "none";
+    const rows = sheetEvents.filter(e => !query || e.msg.toLowerCase().includes(query));
+    $("loglist").innerHTML = rows.length ? rows.map(logRow).join("") : `<div class="empty">Nothing here yet.</div>`;
+    $<HTMLButtonElement>("log-older").style.display = sheetMore ? "" : "none";
+  };
+  const older = async () => {
+    const b = $<HTMLButtonElement>("log-older"); b.disabled = true; b.textContent = "Loading…";
+    try {
+      const oldest = sheetEvents.at(-1)?.t ?? Date.now() / 1000 + 1;
+      const r = await olderEvents(oldest, cat);
+      const seen = new Set(sheetEvents.map(e => e.id));
+      sheetEvents.push(...r.events.filter(e => !seen.has(e.id)));
+      sheetMore = r.more;
+    } catch { /* offline */ }
+    b.disabled = false; b.textContent = "Load older"; draw();
   };
   $("sheet-body").addEventListener("click", async ev => {
     const el = ev.target as HTMLElement;
-    if (el.dataset.f) { filter = el.dataset.f; document.querySelectorAll(".chip").forEach(c => c.classList.toggle("on", c === el)); draw(); }
-    if (el.id === "log-older") {
-      const b = el as HTMLButtonElement; b.disabled = true; b.textContent = "Loading…";
-      try {
-        const oldest = sheetEvents.at(-1)?.t ?? Date.now() / 1000;
-        const r = await olderEvents(oldest);
-        const seen = new Set(sheetEvents.map(e => e.id));
-        sheetEvents.push(...r.events.filter(e => !seen.has(e.id)));
-        sheetMore = r.more;
-      } catch { /* offline */ }
-      b.disabled = false; b.textContent = "Load older"; draw();
-    }
+    if (el.dataset.c) { cat = el.dataset.c; document.querySelectorAll("#sheet-body .chip").forEach(c => c.classList.toggle("on", c === el)); pick(); draw(); if (sheetEvents.length < 20) older(); }
+    if (el.id === "log-older") older();
   });
   $("log-q").addEventListener("input", e => { query = (e.target as HTMLInputElement).value.toLowerCase(); draw(); });
-  draw();
+  pick(); draw(); if (sheetEvents.length < 20) older();
 }
 
 // ---------------- sheet ----------------
@@ -290,7 +273,6 @@ document.addEventListener("click", e => {
   const cmd = el.dataset.cmd!;
   if (cmd === "pc_off_now") { confirmPcOff(); return; }
   if (cmd === "schedule") { openSchedule(); return; }
-  if (cmd === "gamemode_set") { run(cmd, { enabled: !S.t?.salad.gameMode.enabled }); return; }
   if (cmd === "confirm_pc_off") { closeSheet(); run("pc_off_now"); return; }
   if (cmd === "close") { closeSheet(); return; }
   run(cmd);
@@ -363,5 +345,5 @@ new Live({
 setInterval(() => { renderStatus(); renderBanners(); renderLock(); }, 1000);
 renderLock();
 renderLog();
-$("foot").innerHTML = DEMO ? "Demo data: no relay configured yet." : "Live data from your PC · viewing is open to anyone with this link; controls need the password.";
+$("foot").innerHTML = DEMO ? "Demo data: no relay configured yet." : "";
 window.addEventListener("resize", () => renderLog());

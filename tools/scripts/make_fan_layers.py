@@ -42,9 +42,15 @@ for i, (c, (w, h), ang, k) in enumerate(FANS):
     alpha = cv2.GaussianBlur(blade, (5, 5), 0)
     # What sits behind the blades: the visible fins spread into the covered area, darkened (it's in shadow)
     disk = (rr < R * 0.99).astype(np.uint8) * 255
-    hole = cv2.bitwise_and(blade, disk)
-    behind = cv2.inpaint(un, hole, 9, cv2.INPAINT_TELEA).astype(np.float32)
-    behind[hole > 0] *= 0.45
+    # What sits behind the spinning blades: the whole fan disc, motion-blurred all the way round (like a fast fan),
+    # so no still blade shapes stay visible underneath the rotor layer.
+    acc = np.zeros(un.shape, np.float32)
+    steps = 90
+    for k in range(steps):
+        Mr = cv2.getRotationMatrix2D((C, C), k * 360.0 / steps, 1)
+        acc += cv2.warpAffine(un, Mr, (S, S), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE).astype(np.float32)
+    behind = acc / steps * 0.8
+    hole = disk
     # rotor RGBA, plus rotational blur levels for high speeds (anti wagon-wheel)
     rgba = np.dstack([un, alpha])
     for lvl, span in enumerate([0, 10, 24, 50]):
@@ -65,7 +71,7 @@ for i, (c, (w, h), ang, k) in enumerate(FANS):
         cv2.imwrite(f'{OUT}/fan{i}-rotor-b{lvl}.webp', small, [cv2.IMWRITE_WEBP_QUALITY, 88])
     # write the "behind" back into the base photo, inside the rotor disc only
     back = cv2.warpAffine(behind, A, (W, H), flags=cv2.INTER_CUBIC)
-    fmask = cv2.warpAffine(cv2.GaussianBlur(hole, (7, 7), 0).astype(np.float32) / 255, A, (W, H), flags=cv2.INTER_LINEAR)
+    fmask = cv2.warpAffine(cv2.GaussianBlur(hole, (9, 9), 0).astype(np.float32) / 255, A, (W, H), flags=cv2.INTER_LINEAR)
     base = base * (1 - fmask[..., None]) + back * fmask[..., None]
     # transform for the website: frontal disc of the exported (0.62-scaled) rotor -> photo pixels
     sc = .62
@@ -77,7 +83,10 @@ base = np.clip(base, 0, 255).astype(np.uint8)
 cv2.imwrite(f'{OUT}/card-base.webp', cv2.resize(base, (2400, 1350), interpolation=cv2.INTER_AREA), [cv2.IMWRITE_WEBP_QUALITY, 86])
 cv2.imwrite(f'{OUT}/card-base-mobile.webp', cv2.resize(base, (1400, 788), interpolation=cv2.INTER_AREA), [cv2.IMWRITE_WEBP_QUALITY, 84])
 cv2.imwrite(f'{OUT}/card-photo.webp', cv2.resize(a, (2400, 1350), interpolation=cv2.INTER_AREA), [cv2.IMWRITE_WEBP_QUALITY, 86])
-json.dump({'photoW': W, 'photoH': H, 'fans': meta}, open(f'{OUT}/fans.json', 'w'), indent=1)
+prev = json.load(open(f'{OUT}/fans.json')) if os.path.exists(f'{OUT}/fans.json') else {}
+out = {'photoW': W, 'photoH': H, 'fans': meta}
+if 'card' in prev: out['card'] = prev['card']   # hand-traced card outline: keep it
+json.dump(out, open(f'{OUT}/fans.json', 'w'), indent=1)
 
 # Photo B: 2x for sharpness on retina screens (Lanczos + gentle sharpen; to be replaced by Real-ESRGAN on the PC)
 b = cv2.imread('originals/photo-B-gpu-core.webp', cv2.IMREAD_UNCHANGED)

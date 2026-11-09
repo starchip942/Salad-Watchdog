@@ -26,14 +26,14 @@ namespace GpuWatchdog
                 LastLightsResult = lights;
                 if (!ok && !Conf.S.ScreenOffEvenIfLightsFail)
                 {
-                    Log.Warn(lights + " The screen stays on (setting).");
+                    Log.Debug(lights + " The screen stays on (setting).");
                     return lights + " The screen stays on.";
                 }
                 int delay = Math.Max(0, Conf.S.ScreenOffDelaySec);
                 ScreenOffAt = Time.Now + delay;
                 timer?.Dispose();
                 timer = new Timer(_ => ScreenOff(), null, delay * 1000, Timeout.Infinite);
-                Log.Info((ok ? "Lights off, screen off in " : lights + " Screen off in ") + delay + " s.");
+                Log.Debug((ok ? "Lights off, screen off in " : lights + " Screen off in ") + delay + " s.");
                 return (ok ? "Lights off. " : lights + " ") + "Screen turns off in " + delay + " s.";
             }
         }
@@ -44,7 +44,7 @@ namespace GpuWatchdog
             {
                 if (ScreenOffAt == 0) return "Nothing to cancel.";
                 timer?.Dispose(); timer = null; ScreenOffAt = 0;
-                Log.Info("Lights & Screen Off: cancelled. The lights stay off until you turn them on in SignalRGB.");
+                Log.Debug("Lights & Screen Off: cancelled. The lights stay off until you turn them on in SignalRGB.");
                 return "Cancelled. The screen stays on.";
             }
         }
@@ -53,7 +53,7 @@ namespace GpuWatchdog
         {
             lock (Gate) { ScreenOffAt = 0; timer?.Dispose(); timer = null; }
             DisplayOff();
-            Log.Info("Screen off done.");
+            Log.Debug("Screen off done.");
             // Some monitors wake straight away; send the signal again, but not if the person has moved the mouse since
             uint input = Native.LastInputTick();
             foreach (var wait in new[] { 3000, 6000 })

@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Threading;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -15,6 +18,7 @@ namespace GpuWatchdog
         public string nextHourFrom;
         public double? lastPayoutUSD;  // last time Salad credited your balance: how much
         public long lastPayoutAt;      // ...and when (epoch seconds)
+        public long nextHourAt;        // when the next-hour range was last read from Salad's window
     }
 
     /// <summary>
@@ -202,6 +206,92 @@ namespace GpuWatchdog
                 return string.Join(" ", texts);
             }
             catch (Exception e) { LastError = (e.InnerException ?? e).Message; return null; }
+        }
+    }
+
+    /// <summary>
+    /// "Est. Next Hour" only exists in Salad's own window (Salad's servers send it to the window, not to the background service).
+    /// So when you're away from the PC, the watchdog briefly opens Salad's window invisibly (fully transparent, off-screen),
+    /// reads the text the window shows (read-only, like a screen reader), and puts the window back in the tray where it was.
+    /// Nothing is clicked, typed or changed in Salad.
+    /// </summary>
+    static class SaladPeek
+    {
+        delegate bool EnumProc(IntPtr h, IntPtr l);
+        [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc cb, IntPtr l);
+        [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+        [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+        [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int cmd);
+        [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr h, int i);
+        [DllImport("user32.dll")] static extern int SetWindowLong(IntPtr h, int i, int v);
+        [DllImport("user32.dll")] static extern bool SetLayeredWindowAttributes(IntPtr h, uint key, byte alpha, uint flags);
+        [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out RECT r);
+        [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
+        [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+        [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
+        [StructLayout(LayoutKind.Sequential)] struct RECT { public int L, T, R, B; }
+        const int GWL_EXSTYLE = -20, WS_EX_LAYERED = 0x80000, WS_EX_TOOLWINDOW = 0x80, WS_EX_APPWINDOW = 0x40000;
+        const uint SWP_NOSIZE = 1, SWP_NOZORDER = 4, SWP_NOACTIVATE = 0x10, LWA_ALPHA = 2;
+
+        public static string LastResult = "";
+
+        static List<IntPtr> VisibleSalad()
+        {
+            var pids = new HashSet<uint>(Process.GetProcessesByName("Salad").Select(p => (uint)p.Id));
+            var list = new List<IntPtr>();
+            EnumWindows((h, l) => { GetWindowThreadProcessId(h, out uint pid); if (pids.Contains(pid) && IsWindowVisible(h)) list.Add(h); return true; }, IntPtr.Zero);
+            return list;
+        }
+
+        /// <summary>Returns the next-hour range, or null. Only call when Salad's app is running and its window is closed.</summary>
+        public static EarningsData Run()
+        {
+            if (!Salad.AppRunning() || !File.Exists(Salad.AppPath)) { LastResult = "Salad isn't running."; return null; }
+            if (VisibleSalad().Count > 0) { LastResult = "Salad's window is open; read directly."; return null; }
+            var before = new HashSet<IntPtr>(VisibleSalad());
+            var fg = GetForegroundWindow();
+            IntPtr win = IntPtr.Zero; RECT orig = default(RECT); int origEx = 0;
+            try
+            {
+                // Opening Salad again (as you, through Explorer) makes the running Salad show its window
+                Process.Start(new ProcessStartInfo("explorer.exe", "\"" + Salad.AppPath + "\"") { UseShellExecute = false });
+                var until = DateTime.Now.AddSeconds(8);
+                while (DateTime.Now < until && win == IntPtr.Zero)
+                {
+                    foreach (var h in VisibleSalad()) if (!before.Contains(h)) { win = h; break; }
+                    if (win == IntPtr.Zero) Thread.Sleep(10);
+                }
+                if (win == IntPtr.Zero) { LastResult = "Salad's window didn't open."; return null; }
+                // invisible at once: fully transparent, no taskbar button, moved off-screen
+                GetWindowRect(win, out orig);
+                origEx = GetWindowLong(win, GWL_EXSTYLE);
+                SetWindowLong(win, GWL_EXSTYLE, (origEx | WS_EX_LAYERED | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW);
+                SetLayeredWindowAttributes(win, 0, 0, LWA_ALPHA);
+                SetWindowPos(win, IntPtr.Zero, -32000, -32000, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+                if (fg != IntPtr.Zero) SetForegroundWindow(fg);
+                // give the page up to 20 s to show the forecast
+                var end = DateTime.Now.AddSeconds(20);
+                while (DateTime.Now < end)
+                {
+                    Thread.Sleep(1000);
+                    var text = Earnings.ReadSaladText();
+                    var d = text == null ? null : Earnings.Parse(text);
+                    if (d != null && d.estNextHourHighUSD != null) { LastResult = "OK"; return d; }
+                }
+                LastResult = "Salad's window opened but showed no next-hour estimate.";
+                return null;
+            }
+            catch (Exception e) { LastResult = e.Message; return null; }
+            finally
+            {
+                if (win != IntPtr.Zero)
+                {
+                    // back to the tray, exactly as it was (so it opens normally next time you click Salad's icon)
+                    ShowWindow(win, 0);
+                    SetWindowPos(win, IntPtr.Zero, orig.L, orig.T, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+                    SetWindowLong(win, GWL_EXSTYLE, origEx);
+                }
+            }
         }
     }
 }

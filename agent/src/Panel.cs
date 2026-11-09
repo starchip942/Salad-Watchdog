@@ -103,7 +103,7 @@ namespace GpuWatchdog
                         { "settings", new Dictionary<string, object> {
                             { "safetyEnabled", s.SafetyEnabled }, { "safetySensor", s.SafetySensor }, { "safetyCoreLimitC", s.SafetyCoreLimitC },
                             { "safetyHotspotLimitC", s.SafetyHotspotLimitC }, { "safetySamples", s.SafetySamples },
-                            { "gameModeEnabled", s.GameModeEnabled }, { "gameResumeDelaySec", s.GameResumeDelaySec },
+                            { "gameResumeDelaySec", s.GameResumeDelaySec },
                             { "importSteam", s.ImportSteam }, { "importGameFolders", s.ImportGameFolders },
                             { "screenOffDelaySec", s.ScreenOffDelaySec }, { "screenOffEvenIfLightsFail", s.ScreenOffEvenIfLightsFail },
                             { "showEarningsOnWebsite", s.ShowEarningsOnWebsite }, { "viewRequiresPassword", s.ViewRequiresPassword },
@@ -122,7 +122,8 @@ namespace GpuWatchdog
                 case "/api/log":
                     {
                         long before = long.TryParse(req.QueryString["before"], out var bf) ? bf : long.MaxValue;
-                        var all = Log.All().Where(e => e.t < before || (e.t == before && false)).ToList();
+                        var cat = req.QueryString["cat"];
+                        var all = Log.All().Where(e => e.t < before && (string.IsNullOrEmpty(cat) || e.cat == cat)).ToList();
                         var page = all.Skip(Math.Max(0, all.Count - 200)).Reverse().ToList();
                         return new { events = page, more = all.Count > page.Count };
                     }
@@ -148,7 +149,7 @@ namespace GpuWatchdog
                 case "lights_off": return (true, Lights.Start());
                 case "lights_cancel": return (true, Lights.Cancel());
                 case "lights_on": { var m = Lights.SignalRgb(true, out bool ok); return (ok, m); }
-                case "open_log": Process.Start("notepad.exe", "\"" + Log.FilePath + "\""); return (true, "Opened.");
+                case "open_log": Process.Start("explorer.exe", "\"" + Paths.Logs + "\""); return (true, "Opened.");
                 case "open_folder": Process.Start("explorer.exe", "\"" + Paths.Root + "\""); return (true, "Opened.");
                 case "password_set":
                     {
@@ -167,7 +168,7 @@ namespace GpuWatchdog
                         if (name.Length == 0 || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) return (false, "Enter a program name, like KingdomCome.exe.");
                         if (!s.GameProcesses.Contains(name, StringComparer.OrdinalIgnoreCase)) s.GameProcesses.Add(name);
                         s.IgnoreProcesses.RemoveAll(x => x.Equals(name, StringComparison.OrdinalIgnoreCase));
-                        Conf.Save(); Log.Info($"Game added: {name}.exe."); return (true, name + ".exe now counts as a game.");
+                        Conf.Save(); Log.Debug($"Game added: {name}.exe."); return (true, name + ".exe now counts as a game.");
                     }
                 case "game_remove":
                     {
@@ -208,7 +209,6 @@ namespace GpuWatchdog
             s.SafetyCoreLimitC = Int("safetyCoreLimitC", s.SafetyCoreLimitC, 60, 95);
             s.SafetyHotspotLimitC = Int("safetyHotspotLimitC", s.SafetyHotspotLimitC, 70, 110);
             s.SafetySamples = Int("safetySamples", s.SafetySamples, 1, 30);
-            s.GameModeEnabled = B("gameModeEnabled", s.GameModeEnabled);
             s.GameResumeDelaySec = Int("gameResumeDelaySec", s.GameResumeDelaySec, 0, 600);
             s.ImportSteam = B("importSteam", s.ImportSteam);
             s.ImportGameFolders = B("importGameFolders", s.ImportGameFolders);

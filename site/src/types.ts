@@ -3,7 +3,7 @@ export type Num = number | null;
 
 export interface Fan { pct: Num; rpm: Num }
 export interface Temp { name: string; tempC: Num }
-export interface LogEvent { id: string; t: number; level: "info" | "warn" | "error" | string; msg: string }
+export interface LogEvent { id: string; t: number; level: "info" | "warn" | "error" | string; msg: string; cat?: "pc" | "salad" | "earnings" | string }
 export interface Schedule { id: string; action: "pc_off" | "salad_off"; at: number; missed?: boolean }
 
 export type SaladState = "not_running" | "idle" | "paused" | "chopping" | "locked_out" | "unknown";
@@ -19,8 +19,8 @@ export interface Telemetry {
   salad: {
     state: SaladState;
     hold: boolean;
-    gameMode: { enabled: boolean; activeGame: string | null };
-    earnings: null | { balanceUSD: Num; estNextHourLowUSD: Num; estNextHourHighUSD: Num; last24hUSD: Num; updatedAt: number; nextHourFrom?: "salad" | "history" | null };
+    gameMode: { activeGame: string | null };
+    earnings: null | { balanceUSD: Num; estNextHourLowUSD: Num; estNextHourHighUSD: Num; last24hUSD: Num; updatedAt: number; nextHourFrom?: "salad" | "history" | null; nextHourAt?: number | null; lastPayoutUSD?: Num; lastPayoutAt?: number | null };
   };
   safety?: { limitC: number; sensor: "core" | "hotspot" | "either"; hotspotLimitC?: number; sensorFail?: boolean;
              lockout: null | { at: number; tempC: number; sensor: string } };

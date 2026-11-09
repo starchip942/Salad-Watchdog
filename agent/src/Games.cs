@@ -22,7 +22,7 @@ namespace GpuWatchdog
             "unins000", "VC_redist.x64", "VC_redist.x86", "DXSETUP", "CrashReportClient", "crashpad_handler",
             "UnityCrashHandler32", "UnityCrashHandler64", "BsSndRpt64", "BugSplatHD64", "EpicWebHelper", "EpicGamesLauncher",
             "steam", "steamwebhelper", "steamservice", "GalaxyClient", "GOG Galaxy Notifications Renderer" };
-        static readonly string[] NotGameFolders = { "wallpaper_engine", "OBS Studio", "Lossless Scaling", "Steamworks Shared", "Steam Controller Configs", "SteamVR" };
+        static readonly string[] NotGameFolders = { "GameSave", "Content", "wallpaper_engine", "OBS Studio", "Lossless Scaling", "Steamworks Shared", "Steam Controller Configs", "SteamVR" };
 
         public static List<GameFolder> Folders = new List<GameFolder>();
         static DateTime scannedAt = DateTime.MinValue;
@@ -100,6 +100,9 @@ namespace GpuWatchdog
                 catch { }
                 foreach (var drive in DriveInfo.GetDrives().Where(d => d.DriveType == DriveType.Fixed && d.IsReady))
                     foreach (var dir in new[] { "Games", "XboxGames", "Epic Games", "GOG Games" })
+                        foreach (var junk in new[] { "GameSave", "Content" }) Add(System.IO.Path.Combine(drive.RootDirectory.FullName, dir, junk), junk, true, "ignore");
+                foreach (var drive in DriveInfo.GetDrives().Where(d => d.DriveType == DriveType.Fixed && d.IsReady))
+                    foreach (var dir in new[] { "Games", "XboxGames", "Epic Games", "GOG Games" })
                         Add(System.IO.Path.Combine(drive.RootDirectory.FullName, dir), null, false, drive.Name.TrimEnd('\\') + "\\" + dir);
             }
             foreach (var f in s.GameFolders) Add(f, null, false, "Added by you");
@@ -119,7 +122,7 @@ namespace GpuWatchdog
                     try
                     {
                         foreach (var sub in Directory.GetDirectories(f.Path))
-                            if (!Folders.Any(o => o.Name != null && o.Path.StartsWith(sub.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase)))
+                            if (!NotGameFolders.Contains(System.IO.Path.GetFileName(sub), StringComparer.OrdinalIgnoreCase) && !System.IO.Path.GetFileName(sub).StartsWith(".") && !Folders.Any(o => o.Name != null && o.Path.StartsWith(sub.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase)))
                                 lib.Add(new Dictionary<string, object> { { "name", System.IO.Path.GetFileName(sub) }, { "source", f.Source }, { "path", sub } });
                     }
                     catch { }

@@ -9,6 +9,7 @@ namespace GpuWatchdog
     public class LogEvent
     {
         public string id; public long t; public string level; public string msg;
+        public string cat;   // "pc" (temperatures, safety, power), "salad" (Salad's state, games), "earnings"
         [System.Web.Script.Serialization.ScriptIgnore] public string Kind;   // "private" never leaves the PC; "earnings" follows the website setting
     }
 
@@ -19,7 +20,9 @@ namespace GpuWatchdog
     /// </summary>
     static class Log
     {
-        public static string FilePath => Path.Combine(Paths.Logs, "events.log");
+        public static string FilePath => Path.Combine(Paths.Logs, "pc.log");
+        static string FileFor(string cat) => Path.Combine(Paths.Logs, (cat ?? "pc") + ".log");
+        public static readonly string[] Cats = { "pc", "salad", "earnings" };
         const long RotateBytes = 2 * 1024 * 1024;
         static readonly object Gate = new object();
         static readonly List<LogEvent> Recent = new List<LogEvent>();
@@ -33,10 +36,11 @@ namespace GpuWatchdog
             {
                 if (File.Exists(FilePath))
                     last = File.ReadLines(FilePath, Encoding.UTF8).Where(l => l.Trim().Length > 0).LastOrDefault();
+                MigrateOld();
             }
             catch { }
             LoadTail();
-            if (last != null) Append(new string('-', 60));
+            if (last != null) Append("pc", new string('-', 60));
             Info(startLine);
             if (last != null && !last.StartsWith("----------") && !last.Contains("Watchdog closed") && !last.Contains("Watchdog stopped"))
                 Warn("The previous session has no closing time, so it ended unexpectedly (power cut, crash or force-closed).");
@@ -46,36 +50,61 @@ namespace GpuWatchdog
         public static LogEvent Warn(string msg, bool priv = false) => Add("warn", msg, priv ? "private" : null);
         public static LogEvent Error(string msg, bool priv = false) => Add("error", msg, priv ? "private" : null);
         public static LogEvent Earnings(string msg) => Add("info", msg, "earnings");
+        /// <summary>Small things (button presses, connection blips): kept in logs\debug.log only, never shown in the panel or website.</summary>
+        public static void Debug(string msg) { lock (Gate) Append("debug", DateTime.Now.ToString("MM/dd/yyyy h:mm tt", Time.Inv) + ": " + msg); }
+
+        static string CatOf(string msg, string kind)
+        {
+            if (kind == "earnings") return "earnings";
+            var m = msg.ToLowerInvariant();
+            if (m.Contains("payout") || m.Contains("balance")) return "earnings";
+            if ((m.StartsWith("salad") || m.StartsWith("games closed") || m.StartsWith("close salad")) && !m.Contains("°c")) return "salad";
+            if (m.Contains("emergency") || m.Contains("lockout") || m.Contains("locked out") || m.Contains("°c") || m.Contains("temperature") || m.Contains("watchdog") || m.Contains("pc ")) return "pc";
+            if (m.Contains("salad") || m.Contains("chop") || m.Contains("game") || m.Contains(" started (") || m.Contains(" closed")) return "salad";
+            return "pc";
+        }
+
+        /// <summary>One-time: the earlier single events.log becomes the start of the PC log.</summary>
+        static void MigrateOld()
+        {
+            try
+            {
+                var old = Path.Combine(Paths.Logs, "events.log");
+                if (File.Exists(old) && !File.Exists(FilePath)) File.Move(old, FilePath);
+            }
+            catch { }
+        }
 
         public static LogEvent Add(string level, string msg, string kind = null, DateTime? when = null, string whenText = null)
         {
             var now = when ?? DateTime.Now;
-            var e = new LogEvent { t = Time.Epoch(now), level = level, msg = msg, Kind = kind };
+            var e = new LogEvent { t = Time.Epoch(now), level = level, msg = msg, Kind = kind, cat = CatOf(msg, kind) };
             lock (Gate)
             {
                 e.id = Time.Now.ToString() + "-" + (++seq).ToString();
                 Recent.Add(e);
                 if (Recent.Count > 2000) Recent.RemoveRange(0, Recent.Count - 2000);
                 var prefix = level == "warn" ? "Warning: " : level == "error" ? "Error: " : "";
-                Append((whenText ?? now.ToString("MM/dd/yyyy h:mm tt", Time.Inv)) + ": " + prefix + msg);
+                Append(e.cat, (whenText ?? now.ToString("MM/dd/yyyy h:mm tt", Time.Inv)) + ": " + prefix + msg);
             }
             try { Added?.Invoke(e); } catch { }
             return e;
         }
 
-        static void Append(string line)
+        static void Append(string cat, string line)
         {
             try
             {
                 Directory.CreateDirectory(Paths.Logs);
-                var fi = new FileInfo(FilePath);
-                if (fi.Exists && fi.Length > RotateBytes)
+                var file = FileFor(cat);
+                var fi = new FileInfo(file);
+                if (fi.Exists && fi.Length > RotateBytes / 2)
                 {
-                    var old = Path.Combine(Paths.Logs, "events.1.log");
+                    var old = Path.Combine(Paths.Logs, cat + ".1.log");
                     if (File.Exists(old)) File.Delete(old);
-                    File.Move(FilePath, old);
+                    File.Move(file, old);
                 }
-                File.AppendAllText(FilePath, line + "\r\n", new UTF8Encoding(false));
+                File.AppendAllText(file, line + "\r\n", new UTF8Encoding(false));
             }
             catch { }
         }
@@ -85,8 +114,11 @@ namespace GpuWatchdog
         {
             try
             {
-                if (!File.Exists(FilePath)) return;
-                var lines = File.ReadLines(FilePath, Encoding.UTF8).Reverse().Take(400).Reverse();
+              foreach (var cat in Cats)
+              {
+                var file = FileFor(cat);
+                if (!File.Exists(file)) continue;
+                var lines = File.ReadLines(file, Encoding.UTF8).Reverse().Take(400).Reverse();
                 foreach (var l in lines)
                 {
                     int i = l.IndexOf(": ", StringComparison.Ordinal);
@@ -102,9 +134,11 @@ namespace GpuWatchdog
                     var msg = l.Substring(i + 2);
                     var level = msg.StartsWith("Warning: ") ? "warn" : msg.StartsWith("Error: ") ? "error" : "info";
                     if (level != "info") msg = msg.Substring(msg.IndexOf(' ') + 1);
-                    var kind = IsPrivate(msg) ? "private" : msg.StartsWith("Earnings") ? "earnings" : null;
-                    Recent.Add(new LogEvent { id = "f" + Time.Epoch(dt) + "-" + (++seq), t = Time.Epoch(dt), level = level, msg = msg, Kind = kind });
+                    var kind = IsPrivate(msg) ? "private" : cat == "earnings" ? "earnings" : null;
+                    Recent.Add(new LogEvent { id = "f" + Time.Epoch(dt) + "-" + (++seq), t = Time.Epoch(dt), level = level, msg = msg, Kind = kind, cat = cat });
                 }
+              }
+              Recent.Sort((a, b) => a.t.CompareTo(b.t));
             }
             catch { }
         }

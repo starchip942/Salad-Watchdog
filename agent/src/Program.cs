@@ -74,7 +74,7 @@ namespace GpuWatchdog
 
             Paths.Ensure();
             Conf.Load();
-            Log.StartSession($"Watchdog started (new version). It will close Salad for good if the GPU {(Conf.S.SafetySensor == "hotspot" ? "hotspot" : "core")} reaches {(Conf.S.SafetySensor == "hotspot" ? Conf.S.SafetyHotspotLimitC : Conf.S.SafetyCoreLimitC)}°C, and pause it while a game is running.");
+            Log.StartSession("Watchdog started.");
             Shortcut.EnsureDesktopShortcut();
 
             var agent = new Agent();
@@ -100,7 +100,7 @@ namespace GpuWatchdog
 
             agent.Stop();
             panel.Stop();
-            if (!SessionEnd.Ended) Log.Info(restarting ? "Watchdog closed for the update." : "Watchdog closed.");
+            if (!SessionEnd.Ended) { if (restarting) Log.Debug("Watchdog closed for the update."); else Log.Info("Watchdog closed."); }
             mutex.ReleaseMutex();
             return 0;
         }
@@ -128,7 +128,7 @@ namespace GpuWatchdog
                 var bytes = File.ReadAllBytes(lnk);
                 bytes[0x15] |= 0x20;
                 File.WriteAllBytes(lnk, bytes);
-                Log.Info("Created the GPU Watchdog shortcut on the Desktop.");
+                Log.Debug("Created the GPU Watchdog shortcut on the Desktop.");
             }
             catch (Exception e) { Log.Warn("Couldn't create the Desktop shortcut: " + e.Message); }
         }
