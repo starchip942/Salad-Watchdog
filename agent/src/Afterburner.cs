@@ -50,7 +50,8 @@ namespace GpuWatchdog
 
         public static (bool ok, string msg) Apply(int profile, string who)
         {
-            if (profile < 1 || profile > 5) return (false, "Unknown profile.");
+            // only the two profiles set up for this (1 Undervolt, 2 Stock): nobody can apply any other saved profile
+            if (profile != 1 && profile != 2) return (false, "Unknown profile.");
             var exe = ExePath();
             if (exe == null) return (false, "MSI Afterburner isn't installed on this PC.");
             try

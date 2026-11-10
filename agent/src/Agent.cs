@@ -568,6 +568,7 @@ namespace GpuWatchdog
             else if (Json.Num(a, "inMinutes") is double m && m >= 1 && m <= 1440) at = Time.Now + (long)(m * 60);
             else if (Json.Num(a, "at") is double e && e > Time.Now) at = (long)e;
             else return (false, "Pick a time.");
+            lock (G) if (Sched.Items.Count(x => !x.Missed) >= 10) return (false, "Too many schedules already (10). Cancel one first.");
             var item = new ScheduleItem { Id = Settings.NewSecret(6), Action = action, At = at, Source = who };
             lock (G) { Sched.Items.Add(item); Sched.Items.Sort((x, y) => x.At.CompareTo(y.At)); }
             SaveSchedules();
