@@ -647,11 +647,12 @@ namespace GpuWatchdog
                                 Log.Debug("Next-hour window: " + SaladPeek.LastResult);
                                 bool got = false;
                                 if (ok)
-                                    for (int i = 0; i < 25 && !got; i++)
+                                    // Salad shows $0.00 for a little while after its window opens: wait (up to 90 s) for the real number
+                                    for (int i = 0; i < 90 && !got; i++)
                                     {
                                         await Task.Delay(1000);
                                         var t2 = Earnings.ReadSaladText(); var pk = t2 == null ? null : Earnings.Parse(t2);
-                                        if (pk?.estNextHourHighUSD != null) { SetNextHour(pk); got = true; }
+                                        if (pk?.estNextHourHighUSD > 0) { SetNextHour(pk); got = true; }
                                     }
                                 Log.Debug("Next hour from Salad: " + (got ? string.Format(Time.Inv, "${0:0.000}–${1:0.000}", nhLow, nhHigh) : "not readable (" + (Earnings.LastError ?? "no number on the page") + ")"));
                                 // don't keep trying (and opening Salad's window) if it doesn't work on this PC
@@ -690,7 +691,12 @@ namespace GpuWatchdog
         }
 
         double? nhLow, nhHigh; long nhAt; DateTime lastPeek = DateTime.MinValue; int peekFails; DateTime lastNhDiag = DateTime.MinValue;
-        void SetNextHour(EarningsData x) { nhLow = x.estNextHourLowUSD; nhHigh = x.estNextHourHighUSD; nhAt = Time.Now; }
+        /// <summary>Salad's $0.00 means "no estimate yet", not zero: it never replaces a real number.</summary>
+        void SetNextHour(EarningsData x)
+        {
+            if (!(x.estNextHourHighUSD > 0) && nhHigh > 0 && Time.Now - nhAt < 7200) return;
+            nhLow = x.estNextHourLowUSD; nhHigh = x.estNextHourHighUSD; nhAt = Time.Now;
+        }
         /// <summary>Only while you're away (no mouse/keyboard for 3 min), no game running, Salad chopping, at most every 15 min.</summary>
         bool ShouldPeek()
         {
@@ -698,7 +704,8 @@ namespace GpuWatchdog
             if (SaladState != "chopping" || ActiveGames.Count > 0) return false;   // not chopping: Salad shows $0.00 anyway, leave it alone
             if (SaladPeek.Parked) return (DateTime.Now - lastPeek).TotalMinutes >= 5;   // already open invisibly: just read
             if (Lights.ScreenIsOff) return false;                                       // never open anything while the screen is off
-            return (DateTime.Now - lastPeek).TotalMinutes >= 30;                        // open Salad's window at most every 30 minutes
+            // invisible now, so it can look again every 10 minutes (Salad closes the window again after a while)
+            return (DateTime.Now - lastPeek).TotalMinutes >= (nhHigh > 0 && Time.Now - nhAt < 1800 ? 10 : 3);
         }
 
         // ---------------- balance history (for the next-hour estimate) ----------------

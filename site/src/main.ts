@@ -1,6 +1,5 @@
 import "./style.css";
 import { Hero } from "./hero";
-import { layoutCore } from "./core";
 import { DEMO, NO_RELAY, Live, Session, command, login, olderEvents } from "./net";
 import type { HistPoint, LogEvent, Num, Telemetry } from "./types";
 import { ago, esc, isNum, logTime, pcTime, range3, tempClass, tempColor, usd4 } from "./format";
@@ -25,17 +24,6 @@ const tz = () => S.t?.pc?.tz;
 // ---------------- hero ----------------
 const hero = new Hero($("hero-canvas") as HTMLCanvasElement, ASSETS, () => !isWide());
 hero.load().catch(() => { /* image failed: the numbers still work */ });
-
-// ---------------- core die ----------------
-const coreImg = $<HTMLImageElement>("core-img");
-coreImg.src = ASSETS + (devicePixelRatio > 1.5 || isWide() ? "gpu-core.webp" : "gpu-core-mobile.webp");
-const corewrap = $("corewrap");
-const relayoutCore = () => {
-  corewrap.classList.toggle("narrow", corewrap.clientWidth < 620);
-  if (coreImg.complete && coreImg.naturalWidth) layoutCore(corewrap);
-};
-coreImg.addEventListener("load", relayoutCore);
-new ResizeObserver(relayoutCore).observe(corewrap);
 
 // ---------------- number tweening ----------------
 const tweens = new Map<HTMLElement, { from: number; to: number; t0: number; fmt: (v: number) => string }>();
@@ -108,12 +96,6 @@ function render() {
   tween($("t-vram"), isNum(g.vramUsedMB) ? g.vramUsedMB / 1024 : null, v => `${v.toFixed(1)}<small>/ ${isNum(g.vramTotalMB) ? Math.round(g.vramTotalMB / 1024) : "?"} GB</small>`);
   $("t-vram-bar").style.width = isNum(g.vramUsedMB) && isNum(g.vramTotalMB) ? (g.vramUsedMB / g.vramTotalMB * 100) + "%" : "0";
   tween($("t-power"), g.powerW, watts);
-
-  const cc = $("c-core"); cc.textContent = isNum(g.coreC) ? `${Math.round(g.coreC)} °C` : "N/A"; cc.className = "t num " + tempClass(g.coreC);
-  const ch = $("c-hot"); ch.textContent = isNum(g.hotspotC) ? `${Math.round(g.hotspotC)} °C` : "N/A"; ch.className = "t num " + tempClass(g.hotspotC, "hot");
-  const glowC = tempColor(g.coreC);
-  (corewrap.querySelector(".dieglow") as HTMLElement).style.boxShadow = S.online && isNum(g.coreC)
-    ? `0 0 ${30 + Math.max(0, g.coreC - 40)}px ${4 + Math.max(0, (g.coreC - 40) / 6)}px ${glowC}40, inset 0 0 30px ${glowC}30` : "none";
 
   // CPU, memory, storage
   $("cpu-name").textContent = t.cpu.name ?? "";
