@@ -155,20 +155,19 @@ export class Hub {
   // ----- viewers -----
   async acceptViewer(req: Request, url: URL): Promise<Response> {
     if (req.headers.get("Upgrade") !== "websocket") return json({ error: "websocket only" }, 426);
-    if (this.agentInfo.viewRequiresPassword) {
-      const ok = await this.checkToken(url.searchParams.get("token") ?? "");
-      if (!ok) return json({ error: "password required to view" }, 401);
-    }
+    // the logs are only for viewers who entered the password
+    const authed = await this.checkToken(url.searchParams.get("token") ?? "");
+    if (this.agentInfo.viewRequiresPassword && !authed) return json({ error: "password required to view" }, 401);
     const pair = new WebSocketPair();
-    this.state.acceptWebSocket(pair[1], ["view"]);
+    this.state.acceptWebSocket(pair[1], authed ? ["view", "view-auth"] : ["view"]);
     pair[1].send(JSON.stringify({
       type: "hello",
       online: !!this.agentSocket(),
       lastSeen: this.lastSeen,
       last: this.last,
       history: this.history,
-      events: this.events.slice(-EVENTS_HELLO).reverse(),
-      eventsTotal: this.events.length,
+      events: authed ? this.events.slice(-EVENTS_HELLO).reverse() : [],
+      eventsTotal: authed ? this.events.length : 0,
     }));
     this.notifyViewers();
     return new Response(null, { status: 101, webSocket: pair[0] });
@@ -179,9 +178,9 @@ export class Hub {
     if (a) { try { a.send(JSON.stringify({ type: "viewers", n: this.viewerCount() })); } catch { /* reconnecting */ } }
   }
 
-  broadcast(msg: unknown) {
+  broadcast(msg: unknown, tag = "view") {
     const s = JSON.stringify(msg);
-    for (const ws of this.state.getWebSockets("view")) { try { ws.send(s); } catch { /* closed */ } }
+    for (const ws of this.state.getWebSockets(tag)) { try { ws.send(s); } catch { /* closed */ } }
   }
 
   async webSocketMessage(ws: WebSocket, data: string | ArrayBuffer) {
@@ -250,7 +249,7 @@ export class Hub {
     if (!fresh.length) return;
     this.events.sort((a, b) => a.t - b.t);
     if (this.events.length > EVENTS_MAX) this.events.splice(0, this.events.length - EVENTS_MAX);
-    for (const ev of fresh.sort((a, b) => b.t - a.t)) this.broadcast({ type: "event", event: ev });
+    for (const ev of fresh.sort((a, b) => b.t - a.t)) this.broadcast({ type: "event", event: ev }, "view-auth");
   }
 
   async webSocketClose(ws: WebSocket) {
@@ -268,7 +267,7 @@ export class Hub {
 
   // ----- event history (public) -----
   async eventsPage(req: Request, url: URL): Promise<Response> {
-    if (this.agentInfo.viewRequiresPassword && !(await this.checkToken(bearer(req)))) return json({ error: "password required" }, 401);
+    if (!(await this.checkToken(bearer(req)))) return json({ error: "password required" }, 401);   // logs always need the password
     const before = Number(url.searchParams.get("before") ?? Infinity);
     const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit") ?? 100)));
     const cat = url.searchParams.get("cat");

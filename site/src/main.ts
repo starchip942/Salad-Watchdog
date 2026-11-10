@@ -256,7 +256,10 @@ document.addEventListener("click", e => {
   const el = (e.target as HTMLElement).closest<HTMLElement>("[data-cmd],[data-cancel],[data-ab],#log-more");
   if (!el) return;
   if (el.dataset.ab) { run("afterburner_profile", { profile: Number(el.dataset.ab) }); return; }
-  if (el.id === "log-more") { openLogSheet(); return; }
+  if (el.id === "log-more") {
+    if (!$("controls").classList.contains("unlocked")) { msg("Enter the password to see the logs.", false); $("controls").scrollIntoView({ behavior: "smooth", block: "center" }); $("pw").focus(); return; }
+    openLogSheet(); return;
+  }
   if (el.dataset.cancel) { run("schedule_cancel", { id: el.dataset.cancel }); return; }
   const cmd = el.dataset.cmd!;
   if (cmd === "pc_off_now") { confirmPcOff(); return; }

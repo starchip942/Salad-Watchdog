@@ -32,7 +32,7 @@ const viewer = new WebSocket(WS + "/view");
 const vm = []; viewer.on("message", d => vm.push(JSON.parse(d)));
 await new Promise(r => viewer.on("open", r)); await wait(300);
 assert(vm[0]?.type === "hello" && vm[0].online === true, "viewer hello shows online");
-assert(vm[0].events.length === 1, "viewer gets recent events");
+assert(vm[0].events.length === 0, "viewer without the password gets no logs");
 assert(agentMsgs.some(m => m.type === "viewers" && m.n === 1), "agent told viewer count");
 agent.send(JSON.stringify({ type: "telemetry", data: { v: 1, t: 2000, gpu: { tempC: 61, fans: [{ pct: 40 }] } } }));
 await wait(300);
@@ -77,9 +77,12 @@ r = await post("/auth", { password: "test-pass-1" }, null, "9.9.9.9");
 assert(r.status === 401, "old password no longer works");
 r = await post("/auth", { password: "new-pass-1" }, null, "9.9.9.9");
 assert(r.status === 200, "new password works");
+const token2 = (await r.json()).token;
 
-r = await fetch(BASE + "/events?limit=10"); j = await r.json();
-assert(j.events.length === 1 && j.events[0].id === "e1", "event history endpoint");
+r = await fetch(BASE + "/events?limit=10");
+assert(r.status === 401, "logs need the password");
+r = await fetch(BASE + "/events?limit=10", { headers: { authorization: "Bearer " + token2 } }); j = await r.json();
+assert(j.events.length === 1 && j.events[0].id === "e1", "event history endpoint with the password");
 
 agent.close(); await wait(400);
 assert(vm.some(m => m.type === "status" && m.online === false), "viewer told when PC goes offline");
