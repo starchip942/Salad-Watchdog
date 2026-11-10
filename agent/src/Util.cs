@@ -142,7 +142,9 @@ namespace GpuWatchdog
         }
 
         /// <summary>For `seconds`, hide any window of these apps that wasn't showing when we started.</summary>
-        public static void HideNew(int seconds, params string[] processNames)
+        public static void HideNew(int seconds, params string[] processNames) => HideNew(seconds, true, 300, processNames);
+        /// <summary>respectUser: leave a window alone if you just clicked/typed (you may have opened it yourself).</summary>
+        public static void HideNew(int seconds, bool respectUser, int pollMs, params string[] processNames)
         {
             var before = Visible(processNames);
             System.Threading.Tasks.Task.Run(() =>
@@ -150,12 +152,12 @@ namespace GpuWatchdog
                 var until = DateTime.Now.AddSeconds(seconds);
                 while (DateTime.Now < until)
                 {
-                    System.Threading.Thread.Sleep(300);
+                    System.Threading.Thread.Sleep(pollMs);
                     foreach (var h in Visible(processNames))
                     {
                         if (before.Contains(h)) continue;
                         // you clicked the tray icon / a shortcut yourself: leave that window alone and stop guarding
-                        if (SaladPeek.MouseOnTaskbar() || Native.UserActiveWithinMs(2500)) return;
+                        if (respectUser && (SaladPeek.MouseOnTaskbar() || Native.UserActiveWithinMs(2500))) return;
                         ShowWindow(h, 0);   // SW_HIDE: back to the tray
                         Log.Debug("Hid a " + string.Join("/", processNames) + " window that popped up by itself while starting.");
                     }

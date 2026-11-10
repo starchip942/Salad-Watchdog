@@ -58,7 +58,9 @@ namespace GpuWatchdog
             {
                 bool wasRunning = Process.GetProcessesByName("MSIAfterburner").Length > 0;
                 // if Afterburner has to start for this, keep its window out of the way (it stays in the tray)
-                if (!wasRunning) WindowGuard.HideNew(20, "MSIAfterburner");
+                // Afterburner stays in the tray: any of its windows that comes up because of this is sent back at once
+                // (also when it was already running, since passing a profile can bring its window to the front)
+                WindowGuard.HideNew(wasRunning ? 6 : 25, false, 30, "MSIAfterburner");
                 Process.Start(new ProcessStartInfo(exe, "-Profile" + profile) { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(exe) });
                 Current = profile; AppliedAt = Time.Now;
                 Conf.S.AfterburnerLastProfile = profile; Conf.Save();
