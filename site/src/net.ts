@@ -182,6 +182,7 @@ function demoCommand(cmd: string, args: Record<string, unknown>) {
       demoT.schedules.push({ id: "s" + Math.random().toString(36).slice(2, 7), action: args.action as "pc_off", at }); msg = "Scheduled."; break;
     }
     case "afterburner_profile": demoT.afterburner = { ...demoT.afterburner!, profile: Number(args.profile) }; msg = (Number(args.profile) === 1 ? "Undervolt" : "Stock") + " applied."; break;
+    case "lights_off": msg = "Lights off. Screen turns off in 20 s."; break;
     case "schedule_cancel": demoT.schedules = demoT.schedules.filter(x => x.id !== args.id); msg = "Schedule cancelled."; break;
   }
   ev(`Website: ${msg}`);

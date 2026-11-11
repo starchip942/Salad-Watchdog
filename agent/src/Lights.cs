@@ -22,6 +22,10 @@ namespace GpuWatchdog
         {
             lock (Gate)
             {
+                // pressing it again never undoes anything: during the countdown it just keeps counting,
+                // and once the screen is off it only makes sure it stays off
+                if (ScreenOffAt > 0) return "Already on it: screen turns off in " + Math.Max(0, ScreenOffAt - Time.Now) + " s.";
+                if (ScreenIsOff) { DisplayOff(); return "Lights and screen are already off."; }
                 var lights = SignalRgb(false, out bool ok);
                 LastLightsResult = lights;
                 if (!ok && !Conf.S.ScreenOffEvenIfLightsFail)

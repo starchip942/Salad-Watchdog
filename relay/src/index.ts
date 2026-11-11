@@ -31,7 +31,7 @@ const GLOBAL_LOCK_S = 900;
 
 export const COMMANDS = new Set([
   "pc_off_now", "shutdown_cancel", "salad_chop_now", "salad_pause", "salad_off_now",
-  "afterburner_profile", "schedule_add", "schedule_cancel",
+  "afterburner_profile", "lights_off", "schedule_add", "schedule_cancel",
 ]);
 
 // ---------- worker entry ----------

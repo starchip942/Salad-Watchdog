@@ -604,6 +604,7 @@ namespace GpuWatchdog
                 case "salad_chop_now": return ChopNow(w);
                 case "salad_pause": return Pause(w + ":", true);
                 case "salad_off_now": return CloseSalad(w);
+                case "lights_off": { var r = Lights.Start(); if (who == "website") Log.Debug("Lights & Screen Off from the website."); SendTelemetry(); return (true, r); }
                 case "afterburner_profile": { var r = Afterburner.Apply((int)(Json.Num(args, "profile") ?? 0), w); SendTelemetry(); return r; }
                 case "schedule_add": return AddSchedule(args, w);
                 case "schedule_cancel": return CancelSchedule(Json.Str(args, "id"), w);
