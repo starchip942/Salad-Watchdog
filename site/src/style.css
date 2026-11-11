@@ -220,3 +220,8 @@ footer{color:var(--dim);font-size:11px;text-align:center;line-height:1.7;padding
 
 .sheet-ctrls{grid-template-columns:1fr 1fr;margin-top:8px}
 #sheet-body .sched{margin-top:10px}
+
+.task-row{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:13px}
+.task-row:first-child{border-top:0}.task-row small{color:var(--dim)}.task-row .num{color:var(--mute);white-space:nowrap}
+.tk{font-size:10px;padding:1px 6px;border-radius:6px;margin-left:4px;text-transform:uppercase;letter-spacing:.06em}
+.tk.game{background:rgba(255,181,71,.14);color:#ffb547}.tk.salad{background:rgba(182,242,74,.12);color:#b6f24a}

@@ -183,6 +183,7 @@ function demoCommand(cmd: string, args: Record<string, unknown>) {
     }
     case "afterburner_profile": demoT.afterburner = { ...demoT.afterburner!, profile: Number(args.profile) }; msg = (Number(args.profile) === 1 ? "Undervolt" : "Stock") + " applied."; break;
     case "pc_sleep_now": demoT.shutdown = { pendingAt: Math.floor(Date.now() / 1000) + 30, kind: "sleep" }; msg = "Sleeping in 30 s."; break;
+    case "tasks_list": return Promise.resolve({ ok: true, msg: JSON.stringify({ tasks: [{ n: "Salad jobs (Linux: salad-enterprise-linux)", c: 1, mb: null, k: "salad" }, { n: "KingdomCome", c: 1, mb: 9300, k: "game" }, { n: "vmmemWSL", c: 1, mb: 12800, k: "salad" }, { n: "brave", c: 14, mb: 1900, k: null }, { n: "Salad", c: 5, mb: 420, k: "salad" }] }) });
     case "lights_off": msg = "Lights off. Screen turns off in 20 s."; break;
     case "schedule_cancel": demoT.schedules = demoT.schedules.filter(x => x.id !== args.id); msg = "Schedule cancelled."; break;
   }

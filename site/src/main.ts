@@ -259,9 +259,10 @@ async function run(cmd: string, args: Record<string, unknown> = {}) {
 }
 
 document.addEventListener("click", e => {
-  const el = (e.target as HTMLElement).closest<HTMLElement>("[data-cmd],[data-cancel],[data-ab],#log-more,#ctl-open");
+  const el = (e.target as HTMLElement).closest<HTMLElement>("[data-cmd],[data-cancel],[data-ab],#log-more,#ctl-open,#tasks-open");
   if (!el) return;
   if (el.dataset.ab) { run("afterburner_profile", { profile: Number(el.dataset.ab) }); return; }
+  if (el.id === "tasks-open") { openTasks(); return; }
   if (el.id === "ctl-open") {
     if (!$("controls").classList.contains("unlocked")) { msg("Enter the password first.", false); $("controls").scrollIntoView({ behavior: "smooth", block: "center" }); $("pw").focus(); return; }
     openControlsSheet(); return;
@@ -280,6 +281,25 @@ document.addEventListener("click", e => {
   if (cmd === "close") { closeSheet(); return; }
   run(cmd);
 });
+
+/** What's running on the PC (needs the password; read-only). */
+async function openTasks() {
+  if (!$("controls").classList.contains("unlocked")) { msg("Enter the password first.", false); return; }
+  openSheet("Running tasks", `<input class="search" id="tk-q" placeholder="Search, e.g. Kingdom or Salad" aria-label="Search tasks">
+    <div class="loglist" id="tk-list"><div class="empty">Asking the PC…</div></div>`);
+  type T = { n: string; c: number; mb: number | null; k: string | null };
+  let tasks: T[] = [];
+  const draw = () => {
+    const q = ($<HTMLInputElement>("tk-q").value || "").toLowerCase();
+    const rows = tasks.filter(t => !q || t.n.toLowerCase().includes(q));
+    $("tk-list").innerHTML = rows.length ? rows.map(t => `<div class="task-row"><span>${esc(t.n)}${t.c > 1 ? ` <small>×${t.c}</small>` : ""}${t.k ? ` <span class="tk ${t.k}">${t.k === "game" ? "game" : "Salad"}</span>` : ""}</span><span class="num">${t.mb == null ? "" : t.mb >= 1024 ? (t.mb / 1024).toFixed(1) + " GB" : t.mb + " MB"}</span></div>`).join("") : `<div class="empty">Nothing matches.</div>`;
+  };
+  $("tk-q").addEventListener("input", draw);
+  const r = await command("tasks_list");
+  if (!r.ok) { $("tk-list").innerHTML = `<div class="empty">${esc(r.msg || "The PC didn't answer.")}</div>`; return; }
+  try { tasks = JSON.parse(r.msg).tasks; } catch { tasks = []; }
+  draw();
+}
 
 function confirmSleep() {
   if (!$("controls").classList.contains("unlocked")) { msg("Enter the password first.", false); return; }

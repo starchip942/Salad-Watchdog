@@ -544,6 +544,25 @@ namespace GpuWatchdog
             return (true, "Shutting down in 30 seconds. You can cancel it.");
         }
 
+        /// <summary>What's running on the PC right now (read-only), grouped by program, biggest first. Games and Salad's parts are marked.</summary>
+        string TasksJson()
+        {
+            var games = new HashSet<string>(ActiveGames.Select(g => g.Program.Replace(".exe", "")), StringComparer.OrdinalIgnoreCase);
+            var saladish = new HashSet<string>(Salad.Processes.Concat(new[] { "wsl", "wslhost", "wslrelay", "wslservice", "vmmem", "vmmemWSL", "vmcompute" }), StringComparer.OrdinalIgnoreCase);
+            var rows = new Dictionary<string, double[]>(StringComparer.OrdinalIgnoreCase);   // name -> [count, MB]
+            foreach (var p in System.Diagnostics.Process.GetProcesses())
+            {
+                try { var n = p.ProcessName; if (!rows.TryGetValue(n, out var r)) rows[n] = r = new double[2]; r[0]++; r[1] += p.WorkingSet64 / 1048576.0; }
+                catch { }
+                finally { p.Dispose(); }
+            }
+            var list = rows.OrderByDescending(kv => kv.Value[1]).Take(300).Select(kv => new Dictionary<string, object> {
+                { "n", kv.Key }, { "c", (int)kv.Value[0] }, { "mb", Math.Round(kv.Value[1]) },
+                { "k", games.Contains(kv.Key) ? "game" : saladish.Contains(kv.Key) ? "salad" : null } }).ToList<object>();
+            if (distroRunning) list.Insert(0, new Dictionary<string, object> { { "n", "Salad jobs (Linux: " + Salad.Distro + ")" }, { "c", 1 }, { "mb", null }, { "k", "salad" } });
+            return Json.Write(new Dictionary<string, object> { { "tasks", list }, { "t", Time.Now } });
+        }
+
         /// <summary>Sleep (not shut down) after a 30-second countdown that can be cancelled like a shutdown. Salad stops while asleep.</summary>
         public (bool ok, string msg) PcSleep(string who)
         {
@@ -629,6 +648,7 @@ namespace GpuWatchdog
                 case "salad_pause": return Pause(w + ":", true);
                 case "salad_off_now": return CloseSalad(w);
                 case "lights_off": { var r = Lights.Start(); if (who == "website") Log.Debug("Lights & Screen Off from the website."); SendTelemetry(); return (true, r); }
+                case "tasks_list": return (true, TasksJson());
                 case "afterburner_profile": { var r = Afterburner.Apply((int)(Json.Num(args, "profile") ?? 0), w); SendTelemetry(); return r; }
                 case "schedule_add": return AddSchedule(args, w);
                 case "schedule_cancel": return CancelSchedule(Json.Str(args, "id"), w);
