@@ -552,18 +552,80 @@ namespace GpuWatchdog
         {
             var games = new HashSet<string>(ActiveGames.Select(g => g.Program.Replace(".exe", "")), StringComparer.OrdinalIgnoreCase);
             var saladish = new HashSet<string>(Salad.Processes.Concat(new[] { "wsl", "wslhost", "wslrelay", "wslservice", "vmmem", "vmmemWSL", "vmcompute" }), StringComparer.OrdinalIgnoreCase);
-            var rows = new Dictionary<string, double[]>(StringComparer.OrdinalIgnoreCase);   // name -> [count, MB]
-            foreach (var p in System.Diagnostics.Process.GetProcesses())
+            // two snapshots ~0.7 s apart: CPU time used and GPU engine use in between (read-only)
+            Dictionary<int, (string name, double cpuMs, double mb)> Snap()
             {
-                try { var n = p.ProcessName; if (!rows.TryGetValue(n, out var r)) rows[n] = r = new double[2]; r[0]++; r[1] += p.WorkingSet64 / 1048576.0; }
-                catch { }
-                finally { p.Dispose(); }
+                var d = new Dictionary<int, (string, double, double)>();
+                foreach (var p in System.Diagnostics.Process.GetProcesses())
+                {
+                    try { double cpu = 0; try { cpu = p.TotalProcessorTime.TotalMilliseconds; } catch { } d[p.Id] = (p.ProcessName, cpu, p.WorkingSet64 / 1048576.0); }
+                    catch { }
+                    finally { p.Dispose(); }
+                }
+                return d;
+            }
+            System.Diagnostics.InstanceDataCollectionCollection GpuRead()
+            {
+                try { return new System.Diagnostics.PerformanceCounterCategory("GPU Engine").ReadCategory(); } catch { return null; }
+            }
+            var g1 = GpuRead(); var s1 = Snap(); var t1 = DateTime.UtcNow;
+            System.Threading.Thread.Sleep(700);
+            var g2 = GpuRead(); var s2 = Snap(); double ms = (DateTime.UtcNow - t1).TotalMilliseconds;
+            var gpuByPid = new Dictionary<int, double>();
+            try
+            {
+                var a1 = g1?["utilization percentage"]; var a2 = g2?["utilization percentage"];
+                if (a1 != null && a2 != null)
+                    foreach (System.Diagnostics.InstanceData i2 in a2.Values)
+                    {
+                        var m = System.Text.RegularExpressions.Regex.Match(i2.InstanceName, @"pid_(\d+)_");
+                        if (!m.Success || !a1.Contains(i2.InstanceName)) continue;
+                        var v = System.Diagnostics.CounterSample.Calculate(a1[i2.InstanceName].Sample, i2.Sample);
+                        int pid = int.Parse(m.Groups[1].Value);
+                        gpuByPid[pid] = (gpuByPid.TryGetValue(pid, out var o) ? o : 0) + v;
+                    }
+            }
+            catch { }
+            var rows = new Dictionary<string, double[]>(StringComparer.OrdinalIgnoreCase);   // name -> [count, MB, CPU %, GPU %]
+            foreach (var kv in s2)
+            {
+                var (name, cpu2, mb) = kv.Value;
+                if (!rows.TryGetValue(name, out var r)) rows[name] = r = new double[4];
+                r[0]++; r[1] += mb;
+                if (s1.TryGetValue(kv.Key, out var o) && o.name == name) r[2] += Math.Max(0, cpu2 - o.cpuMs) / ms / Environment.ProcessorCount * 100;
+                if (gpuByPid.TryGetValue(kv.Key, out var gp)) r[3] += gp;
             }
             var list = rows.OrderByDescending(kv => kv.Value[1]).Take(300).Select(kv => new Dictionary<string, object> {
                 { "n", kv.Key }, { "c", (int)kv.Value[0] }, { "mb", Math.Round(kv.Value[1]) },
+                { "cpu", Math.Round(Math.Min(100, kv.Value[2]), 1) }, { "gpu", Math.Round(Math.Min(100, kv.Value[3]), 1) },
                 { "k", games.Contains(kv.Key) ? "game" : saladish.Contains(kv.Key) ? "salad" : null } }).ToList<object>();
-            if (distroRunning) list.Insert(0, new Dictionary<string, object> { { "n", "Salad jobs (Linux: " + Salad.Distro + ")" }, { "c", 1 }, { "mb", null }, { "k", "salad" } });
+            if (distroRunning) list.Insert(0, new Dictionary<string, object> { { "n", "Salad jobs (Linux: " + Salad.Distro + ")" }, { "c", 1 }, { "mb", null }, { "cpu", null }, { "gpu", null }, { "k", "salad" }, { "nokill", true } });
             return Json.Write(new Dictionary<string, object> { { "tasks", list }, { "t", Time.Now } });
+        }
+
+        /// <summary>Programs that must never be killed from the website (Windows itself, security, the watchdog).</summary>
+        static readonly HashSet<string> NeverKill = new HashSet<string>(StringComparer.OrdinalIgnoreCase) {
+            "System", "Idle", "Registry", "smss", "csrss", "wininit", "winlogon", "services", "lsass", "lsaiso", "svchost", "dwm",
+            "fontdrvhost", "Memory Compression", "MsMpEng", "NisSrv", "SecurityHealthService", "SecurityHealthSystray", "spoolsv",
+            "explorer", "sihost", "ctfmon", "conhost", "RuntimeBroker", "WmiPrvSE", "audiodg", "LogonUI", "taskhostw", "StartMenuExperienceHost",
+            "ShellExperienceHost", "SearchHost", "TextInputHost", "dllhost", "wudfhost", "MpDefenderCoreService", "vmcompute", "vmmem", "vmmemWSL",
+            "GPU-Watchdog-Agent" };
+
+        /// <summary>Force-closes every copy of one program (asked for from the website/panel, with the password). Windows' own parts are refused.</summary>
+        (bool ok, string msg) KillTask(string name, string who)
+        {
+            name = (name ?? "").Trim();
+            if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) name = name.Substring(0, name.Length - 4);
+            if (name.Length == 0) return (false, "No program given.");
+            if (NeverKill.Contains(name)) return (false, name + " is part of Windows (or the watchdog) and can't be closed from here.");
+            var procs = System.Diagnostics.Process.GetProcessesByName(name);
+            if (procs.Length == 0) return (false, name + " isn't running.");
+            int killed = 0;
+            foreach (var p in procs) { try { p.Kill(); killed++; } catch { } finally { p.Dispose(); } }
+            if (killed == 0) return (false, "Windows wouldn't let " + name + " be closed.");
+            Log.Warn($"Task closed: {name} ({killed}×, {who.ToLowerInvariant()}).");
+            if (Salad.Processes.Contains(name, StringComparer.OrdinalIgnoreCase)) { lastSaladCheck = 0; }
+            return (true, $"Closed {name}" + (killed > 1 ? $" ({killed} copies)." : "."));
         }
 
         /// <summary>Sleep (not shut down) after a 30-second countdown that can be cancelled like a shutdown. Salad stops while asleep.</summary>
@@ -652,6 +714,7 @@ namespace GpuWatchdog
                 case "salad_off_now": return CloseSalad(w);
                 case "lights_off": { var r = Lights.Start(); if (who == "website") Log.Debug("Lights & Screen Off from the website."); SendTelemetry(); return (true, r); }
                 case "tasks_list": return (true, TasksJson());
+                case "task_kill": return KillTask(Json.Str(args, "name"), w);
                 case "afterburner_profile": { var r = Afterburner.Apply((int)(Json.Num(args, "profile") ?? 0), w); SendTelemetry(); return r; }
                 case "schedule_add": return AddSchedule(args, w);
                 case "schedule_cancel": return CancelSchedule(Json.Str(args, "id"), w);

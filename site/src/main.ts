@@ -282,23 +282,50 @@ document.addEventListener("click", e => {
   run(cmd);
 });
 
-/** What's running on the PC (needs the password; read-only). */
+/** What's running on the PC (needs the password). Sort by GPU, CPU or RAM; close a program with a second tap. */
 async function openTasks() {
   if (!$("controls").classList.contains("unlocked")) { msg("Enter the password first.", false); return; }
   openSheet("Running tasks", `<input class="search" id="tk-q" placeholder="Search, e.g. Kingdom or Salad" aria-label="Search tasks">
+    <div class="filters" id="tk-sort"><button class="chip on" data-s="gpu">GPU</button><button class="chip" data-s="cpu">CPU</button><button class="chip" data-s="mb">RAM</button><button class="chip" id="tk-refresh">↻</button></div>
+    <div class="msg" id="tk-msg"></div>
     <div class="loglist" id="tk-list"><div class="empty">Asking the PC…</div></div>`);
-  type T = { n: string; c: number; mb: number | null; k: string | null };
-  let tasks: T[] = [];
+  type T = { n: string; c: number; mb: number | null; cpu: number | null; gpu: number | null; k: string | null; nokill?: boolean };
+  let tasks: T[] = [], sort: "gpu" | "cpu" | "mb" = "gpu", armed = "";
+  const pct = (v: number | null) => v == null ? "" : v < 0.1 ? "0%" : v < 10 ? v.toFixed(1) + "%" : Math.round(v) + "%";
+  const mem = (v: number | null) => v == null ? "" : v >= 1024 ? (v / 1024).toFixed(1) + " GB" : v + " MB";
   const draw = () => {
     const q = ($<HTMLInputElement>("tk-q").value || "").toLowerCase();
-    const rows = tasks.filter(t => !q || t.n.toLowerCase().includes(q));
-    $("tk-list").innerHTML = rows.length ? rows.map(t => `<div class="task-row"><span>${esc(t.n)}${t.c > 1 ? ` <small>×${t.c}</small>` : ""}${t.k ? ` <span class="tk ${t.k}">${t.k === "game" ? "game" : "Salad"}</span>` : ""}</span><span class="num">${t.mb == null ? "" : t.mb >= 1024 ? (t.mb / 1024).toFixed(1) + " GB" : t.mb + " MB"}</span></div>`).join("") : `<div class="empty">Nothing matches.</div>`;
+    const rows = tasks.filter(t => !q || t.n.toLowerCase().includes(q)).sort((a, b) => (b[sort] ?? -1) - (a[sort] ?? -1));
+    const head = `<div class="task-row task-head"><span>Program</span><span class="tv">GPU</span><span class="tv">CPU</span><span class="tv">RAM</span><span></span></div>`;
+    $("tk-list").innerHTML = rows.length ? head + rows.map(t => `<div class="task-row">
+        <span class="tn">${esc(t.n)}${t.c > 1 ? ` <small>×${t.c}</small>` : ""}${t.k ? ` <span class="tk ${t.k}">${t.k === "game" ? "game" : "Salad"}</span>` : ""}</span>
+        <span class="tv ${sort === "gpu" ? "on" : ""}">${pct(t.gpu)}</span><span class="tv ${sort === "cpu" ? "on" : ""}">${pct(t.cpu)}</span><span class="tv ${sort === "mb" ? "on" : ""}">${mem(t.mb)}</span>
+        ${t.nokill ? `<span class="tkill"></span>` : `<button class="tkill ${armed === t.n ? "armed" : ""}" data-kill="${esc(t.n)}" aria-label="Close ${esc(t.n)}">${armed === t.n ? "Close?" : "✕"}</button>`}
+      </div>`).join("") : `<div class="empty">Nothing matches.</div>`;
   };
+  const load = async () => {
+    const r = await command("tasks_list");
+    if (!r.ok) { $("tk-list").innerHTML = `<div class="empty">${esc(r.msg || "The PC didn't answer.")}</div>`; return; }
+    try { tasks = JSON.parse(r.msg).tasks; } catch { tasks = []; }
+    draw();
+  };
+  const tmsg = (t: string, ok: boolean) => { const m = $("tk-msg"); m.textContent = t; m.className = "msg " + (ok ? "ok" : "bad"); };
   $("tk-q").addEventListener("input", draw);
-  const r = await command("tasks_list");
-  if (!r.ok) { $("tk-list").innerHTML = `<div class="empty">${esc(r.msg || "The PC didn't answer.")}</div>`; return; }
-  try { tasks = JSON.parse(r.msg).tasks; } catch { tasks = []; }
-  draw();
+  $("sheet-body").addEventListener("click", async ev => {
+    const el = ev.target as HTMLElement;
+    if (el.dataset.s) { sort = el.dataset.s as typeof sort; document.querySelectorAll("#tk-sort [data-s]").forEach(c => c.classList.toggle("on", c === el)); draw(); return; }
+    if (el.id === "tk-refresh") { $("tk-list").innerHTML = `<div class="empty">Asking the PC…</div>`; await load(); return; }
+    const k = el.closest<HTMLElement>("[data-kill]");
+    if (k) {
+      const name = k.dataset.kill!;
+      if (armed !== name) { armed = name; draw(); setTimeout(() => { if (armed === name) { armed = ""; draw(); } }, 4000); return; }   // first tap: ask
+      armed = ""; tmsg("Closing " + name + "…", true);
+      const r = await command("task_kill", { name });
+      tmsg(r.msg || (r.ok ? "Closed." : "Couldn't close it."), r.ok);
+      await load();
+    }
+  });
+  await load();
 }
 
 function confirmSleep() {

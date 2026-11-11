@@ -221,7 +221,12 @@ footer{color:var(--dim);font-size:11px;text-align:center;line-height:1.7;padding
 .sheet-ctrls{grid-template-columns:1fr 1fr;margin-top:8px}
 #sheet-body .sched{margin-top:10px}
 
-.task-row{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:13px}
+.task-row{display:grid;grid-template-columns:minmax(0,1fr) 48px 48px 62px 50px;gap:6px;align-items:center;padding:7px 0;border-top:1px solid var(--line);font-size:13px}
+.task-row .tn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.task-row .tv{text-align:right;color:var(--dim);font-variant-numeric:tabular-nums;font-size:12px}.task-row .tv.on{color:var(--text)}
+.tkill{height:26px;border-radius:7px;border:1px solid var(--line);font-size:11px;color:var(--mute)}.tkill.armed{border-color:rgba(255,77,94,.6);color:#ff8a95;background:rgba(255,77,94,.1)}
 .task-row:first-child{border-top:0}.task-row small{color:var(--dim)}.task-row .num{color:var(--mute);white-space:nowrap}
 .tk{font-size:10px;padding:1px 6px;border-radius:6px;margin-left:4px;text-transform:uppercase;letter-spacing:.06em}
 .tk.game{background:rgba(255,181,71,.14);color:#ffb547}.tk.salad{background:rgba(182,242,74,.12);color:#b6f24a}
+
+.task-head{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);border-top:0}
+span.tkill{border:0}
