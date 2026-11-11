@@ -192,8 +192,8 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
           <button class="btn small hidden" id="clear-hold" data-cmd="hold_clear" style="width:100%;margin-top:8px">Clear hold</button>
         </div>
         <div class="glass c"><h3>PC power</h3>
-          <button class="btn danger" data-confirm="pc_off_now" style="width:100%;margin-bottom:8px">⏻ Turn PC off now (30 s)</button>
-          <div class="row2"><button class="btn" data-go="schedules">⏱ Schedule…</button><button class="btn" data-cmd="shutdown_cancel" id="cancel-sd">Cancel shutdown</button></div>
+          <div class="row2" style="margin-bottom:8px"><button class="btn danger" data-confirm="pc_off_now">⏻ Turn PC off (30 s)</button><button class="btn" data-confirm="pc_sleep_now">◐ Sleep PC (30 s)</button></div>
+          <div class="row2"><button class="btn" data-go="schedules">⏱ Schedule…</button><button class="btn" data-cmd="shutdown_cancel" id="cancel-sd">Cancel off / sleep</button></div>
           <div class="stack" id="o-sched" style="margin-top:8px"></div>
           <button class="btn danger small" data-confirm="halt_all" style="width:100%;margin-top:8px">■ Halt everything</button>
         </div>
@@ -231,7 +231,7 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
       <div class="h1"><h1>Schedules</h1><span style="color:var(--dim);font-size:12px" id="tz"></span></div>
       <div class="g g2">
         <div class="glass c"><h3>New schedule</h3>
-          <div class="seg" id="s-action" style="margin-bottom:10px"><button class="on" data-v="pc_off">Turn PC off</button><button data-v="salad_off">Close Salad</button></div>
+          <div class="seg" id="s-action" style="margin-bottom:10px"><button class="on" data-v="pc_off">Turn PC off</button><button data-v="pc_sleep">Sleep PC</button><button data-v="salad_off">Close Salad</button></div>
           <div class="seg" id="s-mode" style="margin-bottom:12px"><button class="on" data-v="at">At a time</button><button data-v="in">In … minutes</button></div>
           <div id="s-at"><input type="time" class="inp" id="s-time" value="07:00" style="font-size:28px;height:58px;width:200px;text-align:center"></div>
           <div id="s-in" class="hidden"><input type="number" class="inp" id="s-min" value="30" min="1" max="1440" style="font-size:28px;height:58px;width:200px;text-align:center"> minutes</div>
@@ -347,6 +347,7 @@ document.addEventListener("click", async e => {
   if (el.dataset.cancel) return cmd("schedule_cancel", { id: el.dataset.cancel });
   if (el.dataset.set) { if (inSafety(el)) { P[el.dataset.set] = !el.classList.contains("on"); return renderSettings(); } return setSetting({ [el.dataset.set]: !el.classList.contains("on") }); }
   if (el.dataset.confirm === "halt_all") { if (await confirmBox("Halt everything?", "<p>Force-closes Salad completely (app, service and its jobs), then closes the GPU Watchdog too. Nothing will restart Salad and the website stops updating until you open the watchdog again.</p>", "■ Halt")) cmd("halt_all"); return; }
+  if (el.dataset.confirm === "pc_sleep_now") { if (await confirmBox("Put the PC to sleep?", "<p>The PC goes to sleep after 30 seconds; you can cancel it. Salad stops earning while it sleeps, and it can't be woken from the website.</p>", "◐ Sleep")) cmd("pc_sleep_now"); return; }
   if (el.dataset.confirm === "pc_off_now") { if (await confirmBox("Turn the PC off?", "<p>Windows shuts down after a 30-second countdown; you can cancel it. Salad stops earning, and the PC can't be turned back on remotely.</p>", "⏻ Turn off")) cmd("pc_off_now"); return; }
   cmd(el.dataset.cmd);
 });
@@ -407,7 +408,7 @@ async function refresh() {
   $("tz").textContent = "PC time zone: " + t.pc.tz;
   $("g-active").textContent = S.games.active.length ? S.games.active.join(", ") : "no game";
 
-  const sched = t.schedules.map(x => `<div class="li"><span>${x.action === "pc_off" ? "Turn PC off" : "Close Salad"} · ${fmtT(x.at)}${x.missed ? ' <span class="tag run">missed</span>' : ""}</span><button class="chip" data-cancel="${esc(x.id)}">✕</button></div>`).join("");
+  const sched = t.schedules.map(x => `<div class="li"><span>${x.action === "pc_off" ? "Turn PC off" : x.action === "pc_sleep" ? "Sleep PC" : "Close Salad"} · ${fmtT(x.at)}${x.missed ? ' <span class="tag run">missed</span>' : ""}</span><button class="chip" data-cancel="${esc(x.id)}">✕</button></div>`).join("");
   $("o-sched").innerHTML = sched || `<div style="color:var(--dim);font-size:12.5px">None</div>`;
   $("s-list").innerHTML = sched || `<div style="color:var(--dim);font-size:12.5px">Nothing scheduled.</div>`;
 
@@ -497,7 +498,7 @@ $("g-extra").onclick = async e => { const b = e.target.closest("[data-rm],[data-
 
 // ---------- schedules page ----------
 let sAction = "pc_off", sMode = "at";
-const sHelp = () => { $("s-help").textContent = (sMode === "at" ? `Next ${$("s-time").value || "07:00"} on this PC.` : `In ${$("s-min").value} minutes.`) + (sAction === "pc_off" ? " Once the PC is off it can't be turned back on remotely." : ""); };
+const sHelp = () => { $("s-help").textContent = (sMode === "at" ? `Next ${$("s-time").value || "07:00"} on this PC.` : `In ${$("s-min").value} minutes.`) + (sAction !== "salad_off" ? " Once the PC is off it can't be turned back on remotely." : ""); };
 $("s-action").onclick = e => { if (!e.target.dataset.v) return; sAction = e.target.dataset.v; $("s-action").querySelectorAll("button").forEach(b => b.classList.toggle("on", b === e.target)); sHelp(); };
 $("s-mode").onclick = e => { if (!e.target.dataset.v) return; sMode = e.target.dataset.v; $("s-mode").querySelectorAll("button").forEach(b => b.classList.toggle("on", b === e.target)); $("s-at").classList.toggle("hidden", sMode !== "at"); $("s-in").classList.toggle("hidden", sMode !== "in"); sHelp(); };
 $("s-time").oninput = sHelp; $("s-min").oninput = sHelp;

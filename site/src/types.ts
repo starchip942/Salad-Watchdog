@@ -4,7 +4,7 @@ export type Num = number | null;
 export interface Fan { pct: Num; rpm: Num }
 export interface Temp { name: string; tempC: Num }
 export interface LogEvent { id: string; t: number; level: "info" | "warn" | "error" | string; msg: string; cat?: "pc" | "salad" | "earnings" | string }
-export interface Schedule { id: string; action: "pc_off" | "salad_off"; at: number; missed?: boolean }
+export interface Schedule { id: string; action: "pc_off" | "pc_sleep" | "salad_off"; at: number; missed?: boolean }
 
 export type SaladState = "not_running" | "idle" | "paused" | "chopping" | "locked_out" | "unknown";
 
@@ -25,7 +25,7 @@ export interface Telemetry {
   safety?: { limitC: number; sensor: "core" | "hotspot" | "either"; hotspotLimitC?: number; sensorFail?: boolean;
              lockout: null | { at: number; tempC: number; sensor: string } };
   afterburner?: { available: boolean; profile: number | null; names: string[] };
-  shutdown?: { pendingAt: number | null };
+  shutdown?: { pendingAt: number | null; kind?: "off" | "sleep" | null };
   schedules: Schedule[];
 }
 

@@ -160,7 +160,7 @@ function renderBanners() {
   const pend = t?.shutdown?.pendingAt;
   if (S.online && pend && pend * 1000 > Date.now()) {
     const left = Math.max(0, Math.round(pend - Date.now() / 1000));
-    out.push(`<div class="banner red"><b>PC shutting down in <span class="num">${left} s</span></b>Salad will stop earning.<div class="row-btns"><button class="btn white" data-cmd="shutdown_cancel">Cancel shutdown</button></div></div>`);
+    out.push(`<div class="banner red"><b>PC ${t?.shutdown?.kind === "sleep" ? "going to sleep" : "shutting down"} in <span class="num">${left} s</span></b>Salad will stop earning.<div class="row-btns"><button class="btn white" data-cmd="shutdown_cancel">Cancel</button></div></div>`);
   }
   if (!S.online && S.lastSeen) out.push(`<div class="banner grey">The PC or the Watchdog isn't connected. Showing the last values received <b>${ago((Date.now() - S.lastSeen) / 1000)}</b>. It reconnects by itself when the PC is back.</div>`);
   const html = out.join("");
@@ -170,7 +170,7 @@ function renderBanners() {
 
 function renderSchedules() {
   const list = S.t?.schedules ?? [];
-  $("sched-list").innerHTML = list.map(s => `<div class="sched-item"><span>${s.action === "pc_off" ? "Turn PC off" : "Close Salad"} · ${pcTime(s.at, tz(), true)}${s.missed ? " · missed" : ""}</span><button class="x" data-cancel="${esc(s.id)}" aria-label="Cancel this schedule">✕</button></div>`).join("");
+  $("sched-list").innerHTML = list.map(s => `<div class="sched-item"><span>${s.action === "pc_off" ? "Turn PC off" : s.action === "pc_sleep" ? "Sleep PC" : "Close Salad"} · ${pcTime(s.at, tz(), true)}${s.missed ? " · missed" : ""}</span><button class="x" data-cancel="${esc(s.id)}" aria-label="Cancel this schedule">✕</button></div>`).join("");
 }
 
 // ---------------- logs (three separate logs, in a sheet) ----------------
@@ -273,12 +273,19 @@ document.addEventListener("click", e => {
   if (el.dataset.cancel) { run("schedule_cancel", { id: el.dataset.cancel }); return; }
   const cmd = el.dataset.cmd!;
   if (cmd === "pc_off_now") { confirmPcOff(); return; }
+  if (cmd === "pc_sleep_now") { confirmSleep(); return; }
+  if (cmd === "confirm_sleep") { closeSheet(); run("pc_sleep_now"); return; }
   if (cmd === "schedule") { openSchedule(); return; }
   if (cmd === "confirm_pc_off") { closeSheet(); run("pc_off_now"); return; }
   if (cmd === "close") { closeSheet(); return; }
   run(cmd);
 });
 
+function confirmSleep() {
+  if (!$("controls").classList.contains("unlocked")) { msg("Enter the password first.", false); return; }
+  openSheet("Put the PC to sleep?", `<p class="help">Sleeps in 30 s (you can cancel). Salad stops earning, and it can't be woken from here.</p>
+    <div class="ctrls" style="grid-template-columns:1fr 1fr"><button class="btn" data-cmd="close">Keep it on</button><button class="btn" data-cmd="confirm_sleep">◐ Sleep</button></div>`);
+}
 function confirmPcOff() {
   if (!$("controls").classList.contains("unlocked")) { msg("Enter the password first.", false); return; }
   openSheet("Turn the PC off?", `<p class="help">Shuts down in 30 s. It can't be turned back on from here.</p>
@@ -287,9 +294,9 @@ function confirmPcOff() {
 
 function openSchedule() {
   if (!$("controls").classList.contains("unlocked")) { msg("Enter the password first.", false); return; }
-  let action: "pc_off" | "salad_off" = "pc_off", mode: "at" | "in" = "at";
+  let action: "pc_off" | "pc_sleep" | "salad_off" = "pc_off", mode: "at" | "in" = "at";
   openSheet("Schedule", `
-    <div class="seg" id="seg-a"><button class="on" data-a="pc_off">Turn PC off</button><button data-a="salad_off">Close Salad</button></div>
+    <div class="seg" id="seg-a"><button class="on" data-a="pc_off">Turn PC off</button><button data-a="pc_sleep">Sleep PC</button><button data-a="salad_off">Close Salad</button></div>
     <div class="seg" id="seg-m"><button class="on" data-m="at">At a time</button><button data-m="in">In … minutes</button></div>
     <div id="pick-at"><div class="timepick"><input id="at" type="time" value="07:00" step="60" aria-label="Time"></div>
       <div class="quick">${["07:00", "08:00", "23:00", "00:00"].map(t => `<button class="chip" data-t="${t}">${t}</button>`).join("")}</div></div>

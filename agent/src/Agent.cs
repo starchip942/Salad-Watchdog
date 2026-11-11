@@ -25,7 +25,8 @@ namespace GpuWatchdog
         public List<RunningGame> ActiveGames = new List<RunningGame>();
         public Lockout Lock = new Lockout();
         public ScheduleFile Sched = new ScheduleFile();
-        public long ShutdownAt;
+        public long ShutdownAt, SleepAt;
+        System.Threading.Timer sleepTimer;
         public EarningsData Earn;
         public string EarnStatus = "Not read yet.";
         public bool SensorFail;
@@ -525,6 +526,7 @@ namespace GpuWatchdog
                 lock (G) Sched.Items.Remove(s);
                 SaveSchedules();
                 if (s.Action == "pc_off") { Log.Info("Scheduled shutdown time reached."); PcOff("Schedule"); }
+                else if (s.Action == "pc_sleep") { Log.Info("Scheduled sleep time reached."); PcSleep("Schedule"); }
                 else
                 {
                     var r = CloseSalad("Schedule");
@@ -542,8 +544,29 @@ namespace GpuWatchdog
             return (true, "Shutting down in 30 seconds. You can cancel it.");
         }
 
+        /// <summary>Sleep (not shut down) after a 30-second countdown that can be cancelled like a shutdown. Salad stops while asleep.</summary>
+        public (bool ok, string msg) PcSleep(string who)
+        {
+            if (SleepAt > 0) return (true, $"Already going to sleep in {Math.Max(0, SleepAt - Time.Now)} s.");
+            if (ShutdownAt > 0) return (false, "A shutdown is already counting down.");
+            SleepAt = Time.Now + 30;
+            sleepTimer?.Dispose();
+            sleepTimer = new System.Threading.Timer(_ =>
+            {
+                if (SleepAt == 0) return;
+                SleepAt = 0; SendTelemetry();
+                Log.Info("PC went to sleep.");
+                if (!Native.Sleep()) Log.Warn("Windows refused to sleep.");
+            }, null, 30000, System.Threading.Timeout.Infinite);
+            Log.Warn($"PC going to sleep in 30 s ({who.ToLowerInvariant()}).");
+            SendTelemetry();
+            return (true, "PC goes to sleep in 30 seconds. You can cancel it.");
+        }
+
         public (bool ok, string msg) CancelShutdown(string who)
         {
+            bool hadSleep = SleepAt > 0;
+            if (hadSleep) { sleepTimer?.Dispose(); sleepTimer = null; SleepAt = 0; Log.Info($"PC sleep cancelled ({who.ToLowerInvariant()})."); SendTelemetry(); return (true, "Sleep cancelled."); }
             Proc.Run(Proc.System32("shutdown.exe"), "/a", 8000);
             bool had = ShutdownAt > 0;
             ShutdownAt = 0;
@@ -555,7 +578,7 @@ namespace GpuWatchdog
         public (bool ok, string msg) AddSchedule(Dictionary<string, object> a, string who)
         {
             var action = Json.Str(a, "action");
-            if (action != "pc_off" && action != "salad_off") return (false, "Unknown action.");
+            if (action != "pc_off" && action != "pc_sleep" && action != "salad_off") return (false, "Unknown action.");
             long at;
             var atLocal = Json.Str(a, "atLocal");
             if (!string.IsNullOrEmpty(atLocal))
@@ -588,7 +611,7 @@ namespace GpuWatchdog
             return (true, "Schedule cancelled.");
         }
 
-        static string Label(string action) => action == "pc_off" ? "Turn PC off" : "Close Salad";
+        static string Label(string action) => action == "pc_off" ? "Turn PC off" : action == "pc_sleep" ? "Sleep PC" : "Close Salad";
         void SaveSchedules() { lock (G) Json.Save(Paths.Cfg("schedules.json"), Sched); }
         void SaveState() => Json.Save(Paths.Cfg("state.json"), new Dictionary<string, object> { { "hold", Hold }, { "pausedForGame", PausedForGame }, { "chopUntil", chopUntil }, { "chopVerifyUntil", chopVerifyUntil } });
         long savedChop;   // last chopUntil+verify written, so the file is only rewritten when these change
@@ -600,6 +623,7 @@ namespace GpuWatchdog
             switch (cmd)
             {
                 case "pc_off_now": return PcOff(w);
+                case "pc_sleep_now": return PcSleep(w);
                 case "shutdown_cancel": return CancelShutdown(w);
                 case "salad_chop_now": return ChopNow(w);
                 case "salad_pause": return Pause(w + ":", true);
@@ -776,7 +800,7 @@ namespace GpuWatchdog
                     { "sensor", s.SafetySensor }, { "enabled", s.SafetyEnabled }, { "sensorFail", SensorFail },
                     { "lockout", Lock.Active ? new Dictionary<string, object> { { "at", Lock.At }, { "tempC", Lock.TempC }, { "sensor", Lock.Sensor } } : null } } },
                 { "afterburner", Afterburner.Info() },
-                { "shutdown", new Dictionary<string, object> { { "pendingAt", ShutdownAt > 0 ? (object)ShutdownAt : null } } },
+                { "shutdown", new Dictionary<string, object> { { "pendingAt", ShutdownAt > 0 ? (object)ShutdownAt : SleepAt > 0 ? (object)SleepAt : null }, { "kind", ShutdownAt > 0 ? "off" : SleepAt > 0 ? "sleep" : null } } },
                 { "schedules", sched.Select(x => new Dictionary<string, object> { { "id", x.Id }, { "action", x.Action }, { "at", x.At }, { "missed", x.Missed } }).ToList() },
             };
             return t;

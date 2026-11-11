@@ -168,6 +168,28 @@ namespace GpuWatchdog
 
     static class Native
     {
+        [DllImport("powrprof.dll", SetLastError = true)] static extern bool SetSuspendState(bool hibernate, bool force, bool disableWakeEvents);
+        [DllImport("advapi32.dll", SetLastError = true)] static extern bool OpenProcessToken(IntPtr h, uint access, out IntPtr token);
+        [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)] static extern bool LookupPrivilegeValue(string sys, string name, out long luid);
+        [DllImport("advapi32.dll", SetLastError = true)] static extern bool AdjustTokenPrivileges(IntPtr token, bool disableAll, ref TOKEN_PRIV p, int len, IntPtr prev, IntPtr retLen);
+        [DllImport("kernel32.dll")] static extern IntPtr GetCurrentProcess();
+        [StructLayout(LayoutKind.Sequential, Pack = 4)] struct TOKEN_PRIV { public int Count; public long Luid; public int Attr; }
+        /// <summary>Puts the PC to sleep (not hibernate). Needs the shutdown privilege, which is switched on just for this.</summary>
+        public static bool Sleep()
+        {
+            try
+            {
+                if (OpenProcessToken(GetCurrentProcess(), 0x20 | 0x8, out var tok) && LookupPrivilegeValue(null, "SeShutdownPrivilege", out var luid))
+                {
+                    var tp = new TOKEN_PRIV { Count = 1, Luid = luid, Attr = 2 };
+                    AdjustTokenPrivileges(tok, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
+                    CloseHandle(tok);
+                }
+                return SetSuspendState(false, false, false);
+            }
+            catch { return false; }
+        }
+
         [DllImport("kernel32.dll")] static extern IntPtr OpenProcess(uint access, bool inherit, int pid);
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern bool QueryFullProcessImageName(IntPtr h, int flags, StringBuilder path, ref int size);
         [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr h);
