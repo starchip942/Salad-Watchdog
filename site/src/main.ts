@@ -226,7 +226,13 @@ $("sheet").addEventListener("click", e => { if ((e.target as HTMLElement).closes
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
 
 // ---------------- controls ----------------
-const msg = (text: string, ok?: boolean) => { const m = $("ctl-msg"); m.textContent = text; m.className = "msg" + (ok === true ? " ok" : ok === false ? " bad" : ""); };
+const msg = (text: string, ok?: boolean) => {
+  for (const id of ["ctl-msg", "ctl-msg2"]) { const m = document.getElementById(id); if (!m) continue; m.textContent = text; m.className = "msg" + (ok === true ? " ok" : ok === false ? " bad" : ""); }
+};
+/** The controls as a pop-up (opens by itself right after the password is accepted). */
+function openControlsSheet() {
+  openSheet("Controls", `<div class="msg" id="ctl-msg2" role="status"></div><div class="ctrls sheet-ctrls">${document.querySelector("#controls .ctrls")!.innerHTML}</div><div class="sched">${$("sched-list").innerHTML}</div>`);
+}
 function renderLock() {
   const unlocked = !!Session.token() || (DEMO && Session.exp() * 1000 > Date.now());
   $("controls").classList.toggle("unlocked", unlocked);
@@ -240,7 +246,7 @@ $("lockbar").addEventListener("submit", async e => {
   msg("Checking…");
   const r = await login(pw.value);
   pw.value = "";
-  if (r.ok) { msg("Unlocked for 1 hour.", true); renderLock(); }
+  if (r.ok) { msg("Unlocked for 1 hour.", true); renderLock(); openControlsSheet(); }
   else msg(r.msg, false);
 });
 
@@ -253,9 +259,13 @@ async function run(cmd: string, args: Record<string, unknown> = {}) {
 }
 
 document.addEventListener("click", e => {
-  const el = (e.target as HTMLElement).closest<HTMLElement>("[data-cmd],[data-cancel],[data-ab],#log-more");
+  const el = (e.target as HTMLElement).closest<HTMLElement>("[data-cmd],[data-cancel],[data-ab],#log-more,#ctl-open");
   if (!el) return;
   if (el.dataset.ab) { run("afterburner_profile", { profile: Number(el.dataset.ab) }); return; }
+  if (el.id === "ctl-open") {
+    if (!$("controls").classList.contains("unlocked")) { msg("Enter the password first.", false); $("controls").scrollIntoView({ behavior: "smooth", block: "center" }); $("pw").focus(); return; }
+    openControlsSheet(); return;
+  }
   if (el.id === "log-more") {
     if (!$("controls").classList.contains("unlocked")) { msg("Enter the password to see the logs.", false); $("controls").scrollIntoView({ behavior: "smooth", block: "center" }); $("pw").focus(); return; }
     openLogSheet(); return;

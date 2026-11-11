@@ -216,3 +216,6 @@ footer{color:var(--dim);font-size:11px;text-align:center;line-height:1.7;padding
 
 .sysstack{display:grid;gap:14px}
 @media (min-width: 900px){.sysstack{gap:20px}}
+
+.sheet-ctrls{grid-template-columns:1fr 1fr;margin-top:8px}
+#sheet-body .sched{margin-top:10px}
