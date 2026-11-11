@@ -155,7 +155,7 @@ namespace GpuWatchdog
         void Tick()
         {
             // Salad without a tray icon: removed again within ~2 s whenever Salad (re)adds it
-            if (Time.Now - lastTrayHide >= 2) { lastTrayHide = Time.Now; try { if (SaladTray.Hide()) Log.Debug("Removed Salad's tray icon."); } catch { } }
+            if (Conf.S.HideSaladTrayIcon && Time.Now - lastTrayHide >= 2) { lastTrayHide = Time.Now; try { if (SaladTray.Hide()) Log.Debug("Removed Salad's tray icon."); } catch { } }
             long now = Time.Now;
             Reading r;
             lock (sensors) r = sensors.Read();
