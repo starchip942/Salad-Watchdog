@@ -135,7 +135,8 @@ button{font:inherit;color:inherit;cursor:pointer;background:none;border:0}
 .lockbar .btn{min-height:44px}
 .unlocked .lockbar{display:none}
 .ctrls{display:grid;grid-template-columns:1fr 1fr;gap:9px}
-#controls:not(.unlocked) .ctrls .btn{opacity:.5}
+#controls:not(.unlocked) .ctrls,#controls:not(.unlocked) .sched{display:none}
+#controls.unlocked .lockbar{display:none}
 .msg{font-size:12.5px;min-height:0;margin:-4px 0 10px;color:var(--mute)}
 .msg:empty{display:none}
 .msg.ok{color:var(--green)} .msg.bad{color:#ff8a95}

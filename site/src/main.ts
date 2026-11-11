@@ -246,7 +246,7 @@ $("lockbar").addEventListener("submit", async e => {
   msg("Checking…");
   const r = await login(pw.value);
   pw.value = "";
-  if (r.ok) { msg("Unlocked for 1 hour.", true); renderLock(); openControlsSheet(); }
+  if (r.ok) { msg("Unlocked for 1 hour.", true); renderLock(); }
   else msg(r.msg, false);
 });
 
