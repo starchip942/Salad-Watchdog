@@ -189,6 +189,7 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
         <div class="glass c"><h3>Salad <span id="o-hold"></span></h3>
           <button class="btn go" data-cmd="salad_chop_now" style="width:100%;margin-bottom:8px">▶ Chop Now</button>
           <div class="row2"><button class="btn" data-cmd="salad_pause">❚❚ Pause chopping</button><button class="btn" data-cmd="salad_off_now">✕ Close Salad</button></div>
+          <button class="btn small" data-cmd="salad_open" style="width:100%;margin-top:8px">Open Salad window</button>
           <button class="btn small hidden" id="clear-hold" data-cmd="hold_clear" style="width:100%;margin-top:8px">Clear hold</button>
         </div>
         <div class="glass c"><h3>PC power</h3>
@@ -271,6 +272,7 @@ dialog p{color:var(--mute);line-height:1.55;margin-bottom:12px}
             <div class="set"><div>Show earnings on the website</div><button class="tog" data-set="showEarningsOnWebsite"></button></div>
             <div class="set"><div>Website viewing needs the password</div><button class="tog" data-set="viewRequiresPassword"></button></div>
             <div class="set"><div>Start hidden in the tray</div><button class="tog" data-set="startHiddenInTray"></button></div>
+            <div class="set"><div>Hide Salad's tray icon<div class="d">Salad keeps running in the background</div></div><button class="tog" data-set="hideSaladTrayIcon"></button></div>
             <div class="set"><div>Update interval when nobody is watching</div><div><input class="inp n num" data-num="sampleSecondsIdle"> s</div></div>
             <div class="set"><div>Relay address</div><input class="inp" data-text="relayUrl" style="width:280px" placeholder="https://…workers.dev"></div>
             <div class="set"><div>Data location<div class="d" id="dataloc"></div></div><button class="btn small" data-cmd="open_folder">Open folder</button></div>

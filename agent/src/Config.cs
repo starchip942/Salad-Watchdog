@@ -21,6 +21,7 @@ namespace GpuWatchdog
         public bool ViewRequiresPassword = false;
         public bool ShowEarningsOnWebsite = true;
         public bool StartHiddenInTray = false;
+        public bool HideSaladTrayIcon = true;    // Salad runs in the background without a tray icon
         public int SampleSecondsIdle = 15;      // telemetry interval when nobody watches (1 s when someone does)
 
         // safety

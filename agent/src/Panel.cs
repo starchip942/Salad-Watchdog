@@ -107,7 +107,7 @@ namespace GpuWatchdog
                             { "importSteam", s.ImportSteam }, { "importGameFolders", s.ImportGameFolders },
                             { "screenOffDelaySec", s.ScreenOffDelaySec }, { "screenOffEvenIfLightsFail", s.ScreenOffEvenIfLightsFail },
                             { "showEarningsOnWebsite", s.ShowEarningsOnWebsite }, { "viewRequiresPassword", s.ViewRequiresPassword },
-                            { "startHiddenInTray", s.StartHiddenInTray }, { "sampleSecondsIdle", s.SampleSecondsIdle },
+                            { "startHiddenInTray", s.StartHiddenInTray }, { "hideSaladTrayIcon", s.HideSaladTrayIcon }, { "sampleSecondsIdle", s.SampleSecondsIdle },
                             { "relayUrl", s.RelayUrl }, { "dataFolder", Paths.Root } } },
                         { "hold", a.Hold }, { "pausedForGame", a.PausedForGame }, { "oldWatchdog", a.OldWatchdogRunning }, { "pauseUnsupported", a.PauseUnsupported },
                         { "lockout", a.Lock.Active ? new Dictionary<string, object> { { "at", a.Lock.At }, { "tempC", a.Lock.TempC }, { "sensor", a.Lock.Sensor }, { "temps", a.Lock.RecentTemps } } : null },
@@ -150,6 +150,7 @@ namespace GpuWatchdog
                 case "lights_cancel": return (true, Lights.Cancel());
                 case "lights_on": { var m = Lights.SignalRgb(true, out bool ok); return (ok, m); }
                 case "open_log": Process.Start("explorer.exe", "\"" + Paths.Logs + "\""); return (true, "Opened.");
+                case "salad_open": return (true, SaladTray.OpenWindow());
                 case "halt_all":
                     {
                         // Halt: close Salad completely (app, service, its Linux jobs), then close the watchdog itself
@@ -228,6 +229,9 @@ namespace GpuWatchdog
             bool vr = s.ViewRequiresPassword;
             s.ViewRequiresPassword = B("viewRequiresPassword", s.ViewRequiresPassword);
             s.StartHiddenInTray = B("startHiddenInTray", s.StartHiddenInTray);
+            bool hadTray = s.HideSaladTrayIcon;
+            s.HideSaladTrayIcon = B("hideSaladTrayIcon", s.HideSaladTrayIcon);
+            if (hadTray && !s.HideSaladTrayIcon) SaladTray.Show(); else if (!hadTray && s.HideSaladTrayIcon) SaladTray.Hide();
             s.SampleSecondsIdle = Int("sampleSecondsIdle", s.SampleSecondsIdle, 5, 60);
             var url = Json.Str(a, "relayUrl");
             if (url != null && url.Trim() != s.RelayUrl) { s.RelayUrl = url.Trim(); changes.Add("relayUrl"); }
