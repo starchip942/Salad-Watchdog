@@ -154,7 +154,7 @@ namespace GpuWatchdog
                 case "halt_all":
                     {
                         // Halt: close Salad completely (app, service, its Linux jobs), then close the watchdog itself
-                        try { SaladPeek.Release(); } catch { }
+                        try { SaladPeek.Release(true); } catch { }
                         string res = Salad.Close(0);
                         Log.Warn("Halted from the panel: " + res + " Watchdog closed.");
                         System.Threading.Tasks.Task.Run(async () => { await System.Threading.Tasks.Task.Delay(1500); ClosePanelWindows(); Program.ExitApp?.Invoke(); });

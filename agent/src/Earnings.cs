@@ -470,13 +470,16 @@ namespace GpuWatchdog
         }
 
         /// <summary>Puts the window back exactly as it was (visible, normal position).</summary>
-        public static void Release()
+        [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int cmd);
+        /// <summary>hide: send the window back to the background first (watchdog closing/updating), so it never pops up on screen.</summary>
+        public static void Release(bool hide = false)
         {
             lock (Gate)
             {
                 if (parked == IntPtr.Zero) return;
                 if (IsWindow(parked))
                 {
+                    if (hide) ShowWindow(parked, 0 /*SW_HIDE*/);
                     SetWindowPos(parked, new IntPtr(-2) /*HWND_NOTOPMOST*/, orig.L, orig.T, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
                     SetLayeredWindowAttributes(parked, 0, 255, LWA_ALPHA);
                     SetWindowLong(parked, GWL_EXSTYLE, origEx);
