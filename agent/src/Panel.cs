@@ -262,8 +262,33 @@ namespace GpuWatchdog
         }
 
         // ---------------- the window ----------------
+        delegate bool EnumProc(IntPtr h, IntPtr l);
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool EnumWindows(EnumProc cb, IntPtr l);
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+        [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)] static extern int GetWindowText(IntPtr h, System.Text.StringBuilder sb, int max);
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int cmd);
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
+
+        /// <summary>The panel window if it's already open (its title is the page title).</summary>
+        static IntPtr ExistingWindow()
+        {
+            IntPtr found = IntPtr.Zero;
+            EnumWindows((h, l) =>
+            {
+                if (!IsWindowVisible(h)) return true;
+                var sb = new System.Text.StringBuilder(256); GetWindowText(h, sb, 256);
+                if (sb.ToString().StartsWith("GPU Watchdog — Control Panel")) { found = h; return false; }
+                return true;
+            }, IntPtr.Zero);
+            return found;
+        }
+
         public void Open()
         {
+            // only one panel window: if it's already open, just bring it to the front
+            var open = ExistingWindow();
+            if (open != IntPtr.Zero) { if (IsIconic(open)) ShowWindow(open, 9 /*SW_RESTORE*/); SetForegroundWindow(open); return; }
             var url = Url + "?t=" + Uri.EscapeDataString(Conf.S.PanelToken);
             var edge = FindEdge();
             try
