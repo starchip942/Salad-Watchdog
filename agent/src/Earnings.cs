@@ -97,7 +97,9 @@ namespace GpuWatchdog
         /// Salad's own "active workload" state from the MonitorState stream (event field 11, activeWorkloadState).
         /// Salad's app treats 2 as "a workload is running" (that's what its Chop Now / Pause-until-idle display uses).
         /// </summary>
-        public static List<int> ActiveWorkloadStates(byte[] raw)
+        public static List<int> ActiveWorkloadStates(byte[] raw) => FieldValues(raw, 11);
+        /// <summary>Values of one varint event field in the MonitorState stream (e.g. 9 cpuMiningEnabled, 10 gpuMiningEnabled, 11 activeWorkloadState).</summary>
+        public static List<int> FieldValues(byte[] raw, int fieldNo)
         {
             var list = new List<int>();
             int i = 0;
@@ -105,13 +107,13 @@ namespace GpuWatchdog
             {
                 int len = raw[i + 1] << 24 | raw[i + 2] << 16 | raw[i + 3] << 8 | raw[i + 4];
                 if (len < 0 || i + 5 + len > raw.Length) break;
-                Walk(raw, i + 5, i + 5 + len, 0, list);
+                Walk(raw, i + 5, i + 5 + len, 0, list, fieldNo);
                 i += 5 + len;
             }
             return list;
         }
         /// <summary>Only messages that parse cleanly to the end are trusted (so random bytes aren't read as fields).</summary>
-        static bool Walk(byte[] b, int start, int end, int depth, List<int> found)
+        static bool Walk(byte[] b, int start, int end, int depth, List<int> found, int fieldNo)
         {
             if (depth > 6) return false;
             var mine = new List<int>(); var subs = new List<int[]>();
@@ -120,7 +122,7 @@ namespace GpuWatchdog
             {
                 if (!Varint(b, ref p, end, out ulong tag) || tag == 0) return false;
                 int field = (int)(tag >> 3), wt = (int)(tag & 7);
-                if (wt == 0) { if (!Varint(b, ref p, end, out ulong v)) return false; if (field == 11 && v <= 10) mine.Add((int)v); }
+                if (wt == 0) { if (!Varint(b, ref p, end, out ulong v)) return false; if (field == fieldNo && v <= 10) mine.Add((int)v); }
                 else if (wt == 1) p += 8;
                 else if (wt == 5) p += 4;
                 else if (wt == 2) { if (!Varint(b, ref p, end, out ulong l) || p + (long)l > end) return false; subs.Add(new[] { p, p + (int)l }); p += (int)l; }
@@ -128,7 +130,7 @@ namespace GpuWatchdog
             }
             if (p != end) return false;
             found.AddRange(mine);
-            foreach (var sb in subs) { var tmp = new List<int>(); if (Walk(b, sb[0], sb[1], depth + 1, tmp)) found.AddRange(tmp); }
+            foreach (var sb in subs) { var tmp = new List<int>(); if (Walk(b, sb[0], sb[1], depth + 1, tmp, fieldNo)) found.AddRange(tmp); }
             return true;
         }
 

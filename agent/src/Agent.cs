@@ -83,6 +83,8 @@ namespace GpuWatchdog
             var st = Json.Load<Dictionary<string, object>>(Paths.Cfg("state.json"));
             Hold = Json.Bool(st, "hold") ?? false;
             PausedForGame = Json.Bool(st, "pausedForGame") ?? false;
+            GameLimited = Json.Bool(st, "gameLimited") ?? false;
+            prevCpu = (int)(Json.Num(st, "prevCpu") ?? 1); prevGpu = (int)(Json.Num(st, "prevGpu") ?? 1);
             // a Chop Now that was still being pushed through when the watchdog restarted carries on
             var cu = (long)(Json.Num(st, "chopUntil") ?? 0); var cv = (long)(Json.Num(st, "chopVerifyUntil") ?? 0);
             if (cu > Time.Now) { chopUntil = Math.Max(cu, Time.Now + 120); chopNextTry = Time.Now + 20; }
@@ -446,12 +448,14 @@ namespace GpuWatchdog
             {
                 gamesClosedAt = 0;
                 if (Lock.Active) { Log.Debug($"{g.Name} started; Salad is locked out."); continue; }
-                if (Salad.AnyRunning() || distroRunning)
+                if (GameLimited) continue;   // already limited for another game
+                if (Salad.ServiceRunning()) LimitForGame(g.Name, now);
+                else if (Salad.AnyRunning() || distroRunning)
                 {
-                    // a game always knocks Salad out completely (app, service and its GPU jobs), at once
+                    // Salad's service doesn't answer: fall back to closing Salad completely
                     string res; lock (ActionGate) { chopUntil = 0; res = Salad.Close(0); }
                     PausedForGame = true; SaveState();
-                    Log.Info($"{g.Name} started: Salad force-closed.");
+                    Log.Info($"{g.Name} started: Salad force-closed (its service didn't answer).");
                     lastSaladCheck = 0; distroRunning = Salad.DistroRunning(); UpdateSaladState(); SendTelemetry();
                 }
                 else Log.Debug($"{g.Name} started; Salad wasn't running.");
@@ -463,6 +467,16 @@ namespace GpuWatchdog
                 lock (ActionGate) Salad.Close(0);
                 Log.Debug($"Salad came back while {games[0].Name} is open; closed it again.");
             }
+            // while a game runs: a GPU job Salad had already started is paused (bandwidth sharing keeps going)
+            if (games.Count > 0 && GameLimited && now - lastLimitCheck >= 20)
+            {
+                lastLimitCheck = now;
+                if (saladWorkload == 2 && Time.Now - saladWorkloadAt <= 15)
+                {
+                    try { lock (ActionGate) { chopUntil = 0; chopVerifyUntil = 0; Salad.Call(Salad.StopMethod); } Log.Debug("Salad still had a job running during the game; paused it."); } catch { }
+                }
+            }
+            if (games.Count == 0 && GameLimited && gamesClosedAt == 0) gamesClosedAt = now;   // e.g. the watchdog restarted after the game closed
             foreach (var g in before.Where(b => !games.Any(x => x.Name == b.Name)))
                 Log.Debug(games.Count == 0 ? $"{g.Name} closed; waiting {Conf.S.GameResumeDelaySec} s." : $"{g.Name} closed; {games[0].Name} still running.");
             if (before.Count > 0 && games.Count == 0) gamesClosedAt = now;
@@ -470,6 +484,7 @@ namespace GpuWatchdog
             if (games.Count == 0 && gamesClosedAt > 0 && now - gamesClosedAt >= Conf.S.GameResumeDelaySec)
             {
                 gamesClosedAt = 0;
+                if (GameLimited) { RestoreAfterGame(); return; }
                 if (!PausedForGame) return;
                 if (Lock.Active) { Log.Info("Games closed; Salad stays off (locked out)."); PausedForGame = false; SaveState(); return; }
                 if (Hold) { Log.Info("Games closed; Salad stays paused (you paused it)."); PausedForGame = false; SaveState(); return; }
@@ -477,6 +492,63 @@ namespace GpuWatchdog
                 Log.Info("Games closed → Salad started in Chop Now.");
                 ChopNow("Games closed");
             }
+        }
+
+        // ---------------- games: Salad keeps running, only its CPU and GPU use is switched off ----------------
+        public bool GameLimited; int prevCpu = 1, prevGpu = 1; long lastLimitCheck;
+
+        /// <summary>
+        /// A game started: turn off Salad's "CPU Usage" and "GPU Usage" (Settings → Workload Preferences → Idle Chopping),
+        /// the same switches Salad's own settings page uses, so only bandwidth is shared. Salad itself keeps running.
+        /// </summary>
+        void LimitForGame(string game, long now)
+        {
+            // remember how they were set, so they're put back exactly as you had them
+            try
+            {
+                var raw = Salad.MonitorState(1500);
+                try { var c = Earnings.FieldValues(raw, 9); var gg = Earnings.FieldValues(raw, 10); if (c.Count > 0) prevCpu = c[c.Count - 1]; if (gg.Count > 0) prevGpu = gg[gg.Count - 1]; }
+                finally { Array.Clear(raw, 0, raw.Length); }
+            }
+            catch { prevCpu = prevGpu = 1; }
+            try
+            {
+                lock (ActionGate)
+                {
+                    chopUntil = 0; chopVerifyUntil = 0;
+                    Salad.Call("DisableGpuMiningWorkloads");
+                    Salad.Call("DisableCpuMiningWorkloads");
+                    // a job that's already running is paused right away (bandwidth sharing keeps going)
+                    if (saladWorkload == 2) { try { Salad.Call(Salad.StopMethod); } catch { } }
+                }
+                GameLimited = true; PausedForGame = false; lastLimitCheck = now; SaveState();
+                Log.Info($"{game} started: Salad's CPU and GPU use turned off (bandwidth sharing continues).");
+            }
+            catch (Exception e)
+            {
+                string res; lock (ActionGate) { chopUntil = 0; res = Salad.Close(0); }
+                PausedForGame = true; SaveState();
+                Log.Info($"{game} started: couldn't change Salad's settings ({e.Message}), so Salad was force-closed.");
+            }
+            lastSaladCheck = 0; UpdateSaladState(); SendTelemetry();
+        }
+
+        /// <summary>All games closed: CPU and GPU use back on (as they were before the game), then Chop Now.</summary>
+        void RestoreAfterGame()
+        {
+            try
+            {
+                lock (ActionGate)
+                {
+                    if (prevGpu != 0) Salad.Call("EnableGpuMiningWorkloads");
+                    if (prevCpu != 0) Salad.Call("EnableCpuMiningWorkloads");
+                }
+                GameLimited = false; SaveState();
+                Log.Info("Games closed: Salad's CPU and GPU use turned back on.");
+            }
+            catch (Exception e) { Log.Warn("Couldn't turn Salad's CPU/GPU use back on yet (" + e.Message + "); trying again shortly."); gamesClosedAt = Time.Now; return; }
+            if (Lock.Active || Hold) return;
+            ChopNow("Games closed");
         }
 
         static readonly DateTime Started = DateTime.Now;
@@ -697,7 +769,8 @@ namespace GpuWatchdog
 
         static string Label(string action) => action == "pc_off" ? "Turn PC off" : action == "pc_sleep" ? "Sleep PC" : "Close Salad";
         void SaveSchedules() { lock (G) Json.Save(Paths.Cfg("schedules.json"), Sched); }
-        void SaveState() => Json.Save(Paths.Cfg("state.json"), new Dictionary<string, object> { { "hold", Hold }, { "pausedForGame", PausedForGame }, { "chopUntil", chopUntil }, { "chopVerifyUntil", chopVerifyUntil } });
+        void SaveState() => Json.Save(Paths.Cfg("state.json"), new Dictionary<string, object> { { "hold", Hold }, { "pausedForGame", PausedForGame }, { "chopUntil", chopUntil }, { "chopVerifyUntil", chopVerifyUntil },
+            { "gameLimited", GameLimited }, { "prevCpu", prevCpu }, { "prevGpu", prevGpu } });
         long savedChop;   // last chopUntil+verify written, so the file is only rewritten when these change
 
         // ---------------- commands (website and panel share these) ----------------
