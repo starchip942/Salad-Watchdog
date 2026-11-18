@@ -20,8 +20,9 @@ jobs:
           $ErrorActionPreference = 'Stop'
           # errors become annotations, which can be read without signing in to GitHub
           trap { Write-Host "::error::$($_.Exception.Message) (line $($_.InvocationInfo.ScriptLineNumber))"; exit 1 }
-          $vs =& "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
-          $csc = Join-Path $vs 'MSBuild\Current\Bin\Roslyn\csc.exe'
+          $csc = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -find 'MSBuild\**\Bin\Roslyn\csc.exe' | Select-Object -First 1
+          if (-not $csc) { $csc = Get-ChildItem "$env:ProgramFiles\Microsoft Visual Studio", "${env:ProgramFiles(x86)}\Microsoft Visual Studio" -Recurse -Filter csc.exe -ErrorAction SilentlyContinue | Where-Object FullName -match 'Roslyn' | Select-Object -First 1 -ExpandProperty FullName }
+          if (-not $csc) { throw 'No Roslyn csc.exe on this runner' }
           $ref = @('v4.8', 'v4.8.1', 'v4.7.2') | ForEach-Object { "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\$_" } | Where-Object { Test-Path "$_\mscorlib.dll" } | Select-Object -First 1
           if (-not $ref) { throw 'No .NET Framework 4.x reference assemblies on this runner' }
           Write-Host "csc: $csc"; Write-Host "refs: $ref"
@@ -31,6 +32,7 @@ jobs:
           Expand-Archive lhm.zip lhm
           $dll = Get-ChildItem lhm\lib -Recurse -Filter LibreHardwareMonitorLib.dll |
                  Sort-Object { if ($_.FullName -match '\\net4') { 0 } elseif ($_.FullName -match 'netstandard') { 1 } else { 2 } } | Select-Object -First 1
+          if (-not $dll) { throw ('LibreHardwareMonitorLib.dll not in the package: ' + ((Get-ChildItem lhm -Recurse -File | ForEach-Object { $_.FullName.Substring((Get-Location).Path.Length) }) -join ', ')) }
           New-Item -ItemType Directory -Force agent\lib | Out-Null
           Copy-Item $dll.FullName agent\lib\
           Write-Host "LibreHardwareMonitorLib: $($dll.FullName)"
