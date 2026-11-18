@@ -61,6 +61,9 @@ namespace GpuWatchdog
     static class Time
     {
         public static long Now => DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        [DllImport("kernel32.dll")] static extern ulong GetTickCount64();
+        /// <summary>Seconds since Windows started.</summary>
+        public static long UptimeSeconds() => (long)(GetTickCount64() / 1000);
         public static DateTime Local(long epoch) => DateTimeOffset.FromUnixTimeSeconds(epoch).LocalDateTime;
         public static long Epoch(DateTime local) => new DateTimeOffset(local).ToUnixTimeSeconds();
         public static readonly CultureInfo Inv = CultureInfo.InvariantCulture;

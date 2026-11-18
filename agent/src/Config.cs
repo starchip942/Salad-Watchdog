@@ -32,6 +32,9 @@ namespace GpuWatchdog
         public int SafetyHotspotLimitC = 95;
         public int SafetySamples = 3;           // consecutive 1-second readings at/over the limit
 
+        // after Windows starts: open Salad and Chop Now by itself (only right after a boot, never when the watchdog just restarts)
+        public bool ChopOnStartup = true;
+
         // game mode
         public bool GameModeEnabled = true;
         public string AfterburnerProfile1Name = "Undervolt", AfterburnerProfile2Name = "Stock";

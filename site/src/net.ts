@@ -16,32 +16,66 @@ export interface Handlers {
   needPassword(): void;
 }
 
-/** Live read-only channel to the relay. Reconnects by itself with backoff. */
+/**
+ * Live read-only channel to the relay. Reconnects by itself with backoff.
+ * A phone that moves from Wi-Fi to mobile data (or wakes up after being locked) keeps a dead socket that still
+ * says "open", so silence is treated as a dead link: no message for STALE_MS → drop it and connect again.
+ */
+const STALE_MS = 25000;        // the relay answers our ping every 10 s, so 25 s of silence means the link is gone
+const OPEN_TIMEOUT_MS = 10000; // a connect that hasn't opened by then is abandoned and retried
 export class Live {
   ws: WebSocket | null = null;
   backoff = 1000;
   pingAt = 0;
   timer = 0;
+  lastMsgAt = 0;
+  pingTimer = 0;
   constructor(private h: Handlers) {}
 
   start() {
     if (DEMO) { startDemo(this.h); return; }
     if (NO_RELAY) { this.h.link("closed"); return; }   // this copy of the site doesn't know the PC's address
     this.connect();
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible" && (!this.ws || this.ws.readyState > 1)) this.connect();
-    });
+    // back on screen, back online, or restored from the phone's page cache: make sure the link is really alive
+    const revive = () => { if (document.visibilityState === "visible") this.ensureAlive(); };
+    document.addEventListener("visibilitychange", revive);
+    window.addEventListener("online", () => { this.backoff = 1000; this.connect(); });   // new network: old socket is useless
+    window.addEventListener("pageshow", revive);
+    window.addEventListener("focus", revive);
+  }
+
+  /** Reconnect now unless the current socket is open and has heard from the relay recently. */
+  ensureAlive() {
+    const ws = this.ws;
+    if (ws && ws.readyState === WebSocket.OPEN && Date.now() - this.lastMsgAt < 12000) { this.ping(); return; }
+    if (ws && ws.readyState === WebSocket.CONNECTING) return;
+    this.backoff = 1000;
+    this.connect();
+  }
+
+  /** Drop the current socket without triggering its own reconnect. */
+  drop() {
+    const old = this.ws;
+    this.ws = null;
+    if (old) { old.onopen = old.onmessage = old.onclose = old.onerror = null; try { old.close(); } catch { /* already gone */ } }
   }
 
   connect() {
     clearTimeout(this.timer);
+    clearTimeout(this.pingTimer);
+    this.drop();
     this.h.link("connecting");
     const tok = Session.token();
-    const ws = new WebSocket(RELAY.replace(/^http/, "ws") + "/view" + (tok ? "?token=" + encodeURIComponent(tok) : ""));
+    let ws: WebSocket;
+    try { ws = new WebSocket(RELAY.replace(/^http/, "ws") + "/view" + (tok ? "?token=" + encodeURIComponent(tok) : "")); }
+    catch { this.retry(); return; }
     this.ws = ws;
     let opened = false;
-    ws.onopen = () => { opened = true; this.backoff = 1000; this.h.link("open"); this.ping(); };
+    const openTimer = window.setTimeout(() => { if (this.ws === ws && !opened) { this.drop(); this.h.link("closed"); this.retry(); } }, OPEN_TIMEOUT_MS);
+    ws.onopen = () => { opened = true; clearTimeout(openTimer); this.backoff = 1000; this.lastMsgAt = Date.now(); this.h.link("open"); this.ping(); };
     ws.onmessage = (ev) => {
+      if (this.ws !== ws) return;
+      this.lastMsgAt = Date.now();
       let m: any; try { m = JSON.parse(ev.data); } catch { return; }
       if (m.type === "hello") this.h.hello(m);
       else if (m.type === "telemetry") this.h.telemetry(m.data);
@@ -50,19 +84,30 @@ export class Live {
       else if (m.type === "pong") this.h.link("open", Math.round(performance.now() - this.pingAt));
     };
     ws.onclose = (ev) => {
+      clearTimeout(openTimer);
       if (this.ws !== ws) return;
+      this.ws = null;
       if (!opened && ev.code === 1006 && Session.viewLocked) { this.h.needPassword(); }
       this.h.link("closed");
-      this.timer = window.setTimeout(() => this.connect(), this.backoff);
-      this.backoff = Math.min(this.backoff * 2, 30000);
+      this.retry();
     };
   }
 
+  retry() {
+    clearTimeout(this.timer);
+    this.timer = window.setTimeout(() => this.connect(), this.backoff);
+    this.backoff = Math.min(this.backoff * 2, 10000);
+  }
+
   ping() {
-    if (this.ws?.readyState !== 1) return;
+    clearTimeout(this.pingTimer);
+    const ws = this.ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    // silent for too long: the socket is dead even though it still says "open" (network changed, phone slept)
+    if (Date.now() - this.lastMsgAt > STALE_MS) { this.drop(); this.h.link("closed"); this.backoff = 1000; this.connect(); return; }
     this.pingAt = performance.now();
-    this.ws.send('{"type":"ping"}');
-    window.setTimeout(() => this.ping(), 10000);
+    try { ws.send('{"type":"ping"}'); } catch { /* caught by the silence check */ }
+    this.pingTimer = window.setTimeout(() => this.ping(), 10000);
   }
 }
 

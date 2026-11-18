@@ -1,0 +1,50 @@
+name: Agent
+# Builds agent\GPU-Watchdog-Agent.exe on GitHub (the PC has no C# compiler) and publishes it as the
+# "agent-latest" release, so the PC can fetch it without signing in.
+on:
+  push:
+    branches: [main]
+    paths: ["agent/**", ".github/workflows/agent.yml"]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: { group: agent, cancel-in-progress: true }
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
+          $csc = Join-Path $vs 'MSBuild\Current\Bin\Roslyn\csc.exe'
+          $ref = @('v4.8', 'v4.8.1', 'v4.7.2') | ForEach-Object { "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\$_" } | Where-Object { Test-Path "$_\mscorlib.dll" } | Select-Object -First 1
+          if (-not $ref) { throw 'No .NET Framework 4.x reference assemblies on this runner' }
+          Write-Host "csc: $csc"; Write-Host "refs: $ref"
+
+          # LibreHardwareMonitor (the same 0.9.6 the PC has in agent\lib; only needed to compile against)
+          Invoke-WebRequest https://api.nuget.org/v3-flatcontainer/librehardwaremonitorlib/0.9.6/librehardwaremonitorlib.0.9.6.nupkg -OutFile lhm.zip
+          Expand-Archive lhm.zip lhm
+          $dll = Get-ChildItem lhm\lib -Recurse -Filter LibreHardwareMonitorLib.dll |
+                 Sort-Object { if ($_.FullName -match '\\net4') { 0 } elseif ($_.FullName -match 'netstandard') { 1 } else { 2 } } | Select-Object -First 1
+          New-Item -ItemType Directory -Force agent\lib | Out-Null
+          Copy-Item $dll.FullName agent\lib\
+          Write-Host "LibreHardwareMonitorLib: $($dll.FullName)"
+
+          Set-Location agent
+          $refs = 'mscorlib','System','System.Core','System.Windows.Forms','System.Drawing','System.Web.Extensions','System.Management','System.ServiceProcess','Microsoft.CSharp' |
+                  ForEach-Object { "-r:$ref\$_.dll" }
+          $refs += "-r:$ref\Facades\System.Runtime.dll", "-r:$ref\Facades\netstandard.dll", '-r:lib\LibreHardwareMonitorLib.dll'
+          $src = (Get-ChildItem src\*.cs).FullName
+          & $csc -nologo -langversion:9 -target:winexe -platform:x64 -optimize+ -nowarn:CS0168,CS0219,CS1998,CS4014 `
+            -out:GPU-Watchdog-Agent.exe -win32manifest:app.manifest -win32icon:icon.ico -nostdlib @refs @src
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          Get-Item GPU-Watchdog-Agent.exe | Format-List Name, Length
+      - name: Publish
+        shell: pwsh
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh release delete agent-latest --yes --cleanup-tag 2>$null
+          gh release create agent-latest agent/GPU-Watchdog-Agent.exe --title "Agent (latest build)" --notes "Built from ${{ github.sha }}" --latest=false --target ${{ github.sha }}

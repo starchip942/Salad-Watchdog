@@ -107,6 +107,7 @@ namespace GpuWatchdog
             if (Lock.Active) Log.Error($"Emergency lockout is still active (GPU reached {Lock.TempC:0} °C at {Time.Short(Lock.At)}). Salad stays off until you clear it in the panel.");
             if (Hold) Log.Info("Salad hold still active from earlier: it won't restart after games until you press Start chopping.");
             Games.Rescan(true);
+            if (Conf.S.ChopOnStartup && Time.UptimeSeconds() < 15 * 60) Task.Run(StartupChop);
 
             Relay.OnCommand = (cmd, args) => Command(cmd, args, "website");
             Relay.OnConnected = () =>
@@ -130,6 +131,33 @@ namespace GpuWatchdog
                 if (File.Exists(rep) && File.GetLastWriteTime(rep) > File.GetLastWriteTime(exe)) return;
                 try { Discovery.Run(true, sensors); Log.Debug("Hardware check written to logs\\discovery-report.txt."); } catch (Exception e) { Log.Warn("Hardware check failed: " + e.Message); }
             });
+        }
+
+        /// <summary>
+        /// Windows just started: Chop Now by itself. Runs only within 15 minutes of a boot, so restarting or updating the
+        /// watchdog later never touches Salad. Leaves Salad alone if it's already chopping, a game is running, or the
+        /// overheat lockout is on. A hold from before the reboot (e.g. a scheduled close) is cleared: a boot is a fresh start.
+        /// </summary>
+        async Task StartupChop()
+        {
+            try
+            {
+                // give Salad's service, the game scan and the workload reader time to settle
+                await Task.Delay(45000);
+                if (stopping) return;
+                UpdateSaladState();
+                if (Lock.Active) { Log.Info("Windows started: Salad not started (overheat lockout is on)."); return; }
+                if (ActiveGames.Count > 0)
+                {
+                    if (Hold) { Hold = false; SaveState(); }
+                    Log.Info("Windows started: a game is running, so Chop Now waits until it closes.");
+                    return;
+                }
+                if (SaladState == "chopping" || saladWorkload == 2) { Log.Debug("Windows started: Salad is already chopping."); return; }
+                if (chopUntil > 0 || chopVerifyUntil > 0) return;   // a Chop Now is already being pushed through
+                ChopNow("Windows started");
+            }
+            catch (Exception e) { Log.Warn("Couldn't Chop Now after Windows started: " + e.Message); }
         }
 
         public void Stop()

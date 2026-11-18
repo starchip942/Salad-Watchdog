@@ -50,8 +50,13 @@ namespace GpuWatchdog
                 Log.Error("Unexpected problem: " + e?.GetBaseException().Message);
             }
             catch { }
-            if (fatal) try { MessageBox.Show("GPU Watchdog hit a problem and has to close:\n\n" + e?.GetBaseException().Message + "\n\nDetails are in logs\\crash.txt.", "GPU Watchdog", MessageBoxButtons.OK, MessageBoxIcon.Error); } catch { }
+            // no message box on a fatal crash: it would keep this copy alive (and the watchdog off) until someone clicks OK,
+            // and nobody may be at the PC. Closing instead lets the "GPU Watchdog keep-alive" task start it again within 5 minutes.
+            if (fatal) try { Log.Error("GPU Watchdog closed after a problem; it starts again by itself within 5 minutes. Details are in logs\\crash.txt."); } catch { }
         }
+
+        /// <summary>Written when you close the watchdog on purpose (Quit, Halt), so the keep-alive task leaves it closed.</summary>
+        static string QuitFlag => Paths.Cfg("quit-on-purpose.flag");
 
         static int RunApp()
         {
@@ -63,12 +68,18 @@ namespace GpuWatchdog
             bool owned;
             // after an update the old copy is still closing: wait for it instead of just showing its panel
             var restarted = Environment.GetCommandLineArgs().Contains("--restarted");
+            // started by the keep-alive task (every 5 minutes): only fills in if the watchdog isn't running, silently
+            var keepalive = Environment.GetCommandLineArgs().Contains("--keepalive");
+            if (keepalive && File.Exists(QuitFlag)) return 0;   // you closed it on purpose: stay closed until you start it
             try { owned = mutex.WaitOne(restarted ? 20000 : 0); } catch (AbandonedMutexException) { owned = true; }
             if (!owned)
             {
+                if (keepalive) return 0;   // already running: don't pop its panel up
                 try { using (var ev = EventWaitHandle.OpenExisting(ShowEventName)) ev.Set(); } catch { }
                 return 0;
             }
+            // started by you or at sign-in: the keep-alive task may bring it back again from now on
+            if (!keepalive) try { File.Delete(QuitFlag); } catch { }
 
             if (!new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator))
                 MessageBox.Show("GPU Watchdog works best as administrator (CPU, memory and SSD temperatures, stopping Salad's service).\n\nUse the desktop shortcut, or right-click → Run as administrator.",
@@ -105,6 +116,7 @@ namespace GpuWatchdog
             panel.Stop();
             if (!restarting && !SessionEnd.Ended) Panel.ClosePanelWindows();   // closing the watchdog closes its panel window too
             if (!SessionEnd.Ended) { if (restarting) Log.Debug("Watchdog closed for the update."); else Log.Info("Watchdog closed."); }
+            if (!restarting && !SessionEnd.Ended) try { Paths.Ensure(); File.WriteAllText(QuitFlag, DateTime.Now.ToString("s")); } catch { }
             mutex.ReleaseMutex();
             return 0;
         }
