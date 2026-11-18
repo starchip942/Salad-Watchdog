@@ -18,7 +18,9 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
+          # errors become annotations, which can be read without signing in to GitHub
+          trap { Write-Host "::error::$($_.Exception.Message) (line $($_.InvocationInfo.ScriptLineNumber))"; exit 1 }
+          $vs =& "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
           $csc = Join-Path $vs 'MSBuild\Current\Bin\Roslyn\csc.exe'
           $ref = @('v4.8', 'v4.8.1', 'v4.7.2') | ForEach-Object { "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\$_" } | Where-Object { Test-Path "$_\mscorlib.dll" } | Select-Object -First 1
           if (-not $ref) { throw 'No .NET Framework 4.x reference assemblies on this runner' }
@@ -38,9 +40,11 @@ jobs:
                   ForEach-Object { "-r:$ref\$_.dll" }
           $refs += "-r:$ref\Facades\System.Runtime.dll", "-r:$ref\Facades\netstandard.dll", '-r:lib\LibreHardwareMonitorLib.dll'
           $src = (Get-ChildItem src\*.cs).FullName
-          & $csc -nologo -langversion:9 -target:winexe -platform:x64 -optimize+ -nowarn:CS0168,CS0219,CS1998,CS4014 `
-            -out:GPU-Watchdog-Agent.exe -win32manifest:app.manifest -win32icon:icon.ico -nostdlib @refs @src
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $out = & $csc -nologo -langversion:9 -target:winexe -platform:x64 -optimize+ -nowarn:CS0168,CS0219,CS1998,CS4014 `
+            -out:GPU-Watchdog-Agent.exe -win32manifest:app.manifest -win32icon:icon.ico -nostdlib @refs @src 2>&1
+          $code = $LASTEXITCODE
+          $out | ForEach-Object { Write-Host $_ }
+          if ($code) { $out | Where-Object { "$_" -match 'error' } | Select-Object -First 20 | ForEach-Object { Write-Host "::error::$_" }; exit $code }
           Get-Item GPU-Watchdog-Agent.exe | Format-List Name, Length
       - name: Publish
         shell: pwsh
