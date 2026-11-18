@@ -30,7 +30,7 @@ jobs:
           # LibreHardwareMonitor (the same 0.9.6 the PC has in agent\lib; only needed to compile against)
           Invoke-WebRequest https://api.nuget.org/v3-flatcontainer/librehardwaremonitorlib/0.9.6/librehardwaremonitorlib.0.9.6.nupkg -OutFile lhm.zip
           Expand-Archive lhm.zip lhm
-          $dll = Get-ChildItem lhm\lib -Recurse -Filter LibreHardwareMonitorLib.dll |
+          $dll = Get-ChildItem lhm -Recurse -Filter LibreHardwareMonitorLib.dll |
                  Sort-Object { if ($_.FullName -match '\\net4') { 0 } elseif ($_.FullName -match 'netstandard') { 1 } else { 2 } } | Select-Object -First 1
           if (-not $dll) { throw ('LibreHardwareMonitorLib.dll not in the package: ' + ((Get-ChildItem lhm -Recurse -File | ForEach-Object { $_.FullName.Substring((Get-Location).Path.Length) }) -join ', ')) }
           New-Item -ItemType Directory -Force agent\lib | Out-Null
