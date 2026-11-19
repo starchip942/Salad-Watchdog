@@ -59,6 +59,9 @@ namespace GpuWatchdog
         /// <summary>Written when you close the watchdog on purpose (Quit, Halt), so the keep-alive task leaves it closed.</summary>
         static string QuitFlag => Paths.Cfg("quit-on-purpose.flag");
 
+        const uint ES_CONTINUOUS = 0x80000000, ES_SYSTEM_REQUIRED = 0x00000001;
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern uint SetThreadExecutionState(uint flags);
+
         static int RunApp()
         {
             Application.EnableVisualStyles();
@@ -98,6 +101,9 @@ namespace GpuWatchdog
             ExitApp = () => tray.Invoke(new Action(() => tray.ExitQuietly()));
             agent.Start();
             panel.Start();
+            // Keeps Windows from putting the PC back to sleep ~2 minutes after the 2:00 AM alarm wakes it from sleep with nobody at it.
+            // You can still choose Sleep or Shut down yourself, and the screen still turns off as usual. Held for as long as the watchdog runs.
+            SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
 
             var show = new EventWaitHandle(false, EventResetMode.AutoReset, ShowEventName);
             new Thread(() => { while (show.WaitOne()) tray.Invoke(panel.Open); }) { IsBackground = true }.Start();
