@@ -44,6 +44,8 @@ Go to the PC panel → **Safety & Settings** → **Website password**. Type the 
 1. Check that the PC is on and the tray square is there. If it isn't, double-click the Desktop shortcut.
 2. Check that the PC has internet. The watchdog reconnects by itself within a minute.
 
+**Logs:** the log files in `logs` never grow past 1 MB each; past that, the oldest half is deleted. Old copies of the program left behind by updates are deleted by themselves.
+
 ## 7. Updating
 Just ask Claude to update it. Everything lives in **Desktop\GPU-Watchdog** and on GitHub.
 

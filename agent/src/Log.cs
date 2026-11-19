@@ -16,14 +16,14 @@ namespace GpuWatchdog
     /// <summary>
     /// One log, two views. Same mechanic as the old GPU Watchdog: one line per event in plain text,
     /// "MM/dd/yyyy h:mm tt: message", a dashed line between sessions, a 15-minute GPU temperature average,
-    /// and a note when the previous session ended without a closing line. Kept under ~5 MB by rotating.
+    /// and a note when the previous session ended without a closing line. Each log file stays under 1 MB: past that, its oldest half is deleted.
     /// </summary>
     static class Log
     {
         public static string FilePath => Path.Combine(Paths.Logs, "pc.log");
         static string FileFor(string cat) => Path.Combine(Paths.Logs, (cat ?? "pc") + ".log");
         public static readonly string[] Cats = { "pc", "salad", "earnings" };
-        const long RotateBytes = 2 * 1024 * 1024;
+        public const long MaxBytes = 1024 * 1024;   // 1 MB per log file
         static readonly object Gate = new object();
         static readonly List<LogEvent> Recent = new List<LogEvent>();
         static long seq;
@@ -98,14 +98,39 @@ namespace GpuWatchdog
             {
                 Directory.CreateDirectory(Paths.Logs);
                 var file = FileFor(cat);
-                var fi = new FileInfo(file);
-                if (fi.Exists && fi.Length > RotateBytes / 2)
-                {
-                    var old = Path.Combine(Paths.Logs, cat + ".1.log");
-                    if (File.Exists(old)) File.Delete(old);
-                    File.Move(file, old);
-                }
+                Cap(file);
                 File.AppendAllText(file, line + "\r\n", new UTF8Encoding(false));
+            }
+            catch { }
+        }
+
+        /// <summary>A log file over 1 MB loses its oldest lines: only the newest half (whole lines) is kept.</summary>
+        public static void Cap(string file)
+        {
+            try
+            {
+                var fi = new FileInfo(file);
+                if (!fi.Exists || fi.Length <= MaxBytes) return;
+                var bytes = File.ReadAllBytes(file);
+                int start = bytes.Length - (int)(MaxBytes / 2);
+                while (start < bytes.Length && bytes[start - 1] != (byte)'\n') start++;   // begin at a whole line
+                var keep = new byte[bytes.Length - start];
+                Array.Copy(bytes, start, keep, 0, keep.Length);
+                File.WriteAllBytes(file, keep);
+            }
+            catch { }
+        }
+
+        /// <summary>Every .log and .txt file in logs\ kept under 1 MB; old rotated copies (*.1.log) are removed.</summary>
+        public static void CapAll()
+        {
+            try
+            {
+                if (!Directory.Exists(Paths.Logs)) return;
+                foreach (var f in Directory.GetFiles(Paths.Logs, "*.1.log")) try { File.Delete(f); } catch { }
+                lock (Gate)
+                    foreach (var f in Directory.GetFiles(Paths.Logs).Where(x => x.EndsWith(".log", StringComparison.OrdinalIgnoreCase) || x.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)))
+                        Cap(f);
             }
             catch { }
         }

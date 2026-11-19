@@ -127,6 +127,22 @@ namespace GpuWatchdog
             loop = new Thread(Loop) { IsBackground = true, Name = "watchdog" };
             loop.Start();
             Task.Run(EarningsLoop);
+            // housekeeping: old copies left by updates (GPU-Watchdog-Agent.old*.exe) are deleted, and logs kept under 1 MB
+            Task.Run(async () =>
+            {
+                await Task.Delay(30000);   // the previous copy needs a moment to close after an update
+                while (!stopping)
+                {
+                    try
+                    {
+                        foreach (var f in Directory.GetFiles(Paths.AgentDir, "GPU-Watchdog-Agent.old*.exe"))
+                            try { File.Delete(f); Log.Debug("Deleted the old copy " + Path.GetFileName(f) + "."); } catch { }
+                    }
+                    catch { }
+                    Log.CapAll();
+                    await Task.Delay(3600 * 1000);
+                }
+            });
             // Phase 1 report, written once per version in the background so it can be read without asking you to run anything
             Task.Run(async () =>
             {

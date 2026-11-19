@@ -46,6 +46,7 @@ namespace GpuWatchdog
             try
             {
                 Directory.CreateDirectory(Paths.Logs);
+                Log.Cap(Path.Combine(Paths.Logs, "crash.txt"));
                 File.AppendAllText(Path.Combine(Paths.Logs, "crash.txt"), DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + (fatal ? " FATAL " : " ") + e + "\r\n\r\n");
                 Log.Error("Unexpected problem: " + e?.GetBaseException().Message);
             }
