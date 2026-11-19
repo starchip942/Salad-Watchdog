@@ -101,6 +101,7 @@ namespace GpuWatchdog
             SaveSchedules();
             AutoOff.OnDue = DailyShutdown;
             AutoOff.Changed = () => SendTelemetry();
+            AutoOff.CurrentGame = () => ActiveGames.FirstOrDefault()?.Name;
             AutoOff.Start();
 
             sensors.Open();

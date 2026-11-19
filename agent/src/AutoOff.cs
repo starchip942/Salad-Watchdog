@@ -14,11 +14,13 @@ namespace GpuWatchdog
         public bool Cancelled;       // skipped for this Windows session only
         public string By = "";       // who cancelled / delayed last
         public int Delays;           // how many times "Delay 1 hour" was pressed
+        public bool WaitingForGame;  // the time came while a game was running: shut down 5 minutes after it closes
     }
 
     /// <summary>
     /// Daily auto-shutdown (default 7:00 AM, local time). Every time the watchdog starts after a boot it sets the next 7:00;
-    /// 5 minutes before, a big always-on-top warning appears on the PC and on the website (Cancel / Delay 1 hour);
+    /// 5 minutes before, a plain warning appears on the PC and on the website (OK / Delay 1 hour / Cancel shutdown);
+    /// if a game is running at the time, it waits until the game is closed and shuts down 5 minutes later;
     /// at the time, Salad is closed properly and Windows shuts down fully (not sleep), so the BIOS RTC alarm can wake it at 2:00.
     /// The time is checked against the real clock every second, so sleep or a busy PC can't make it drift.
     /// </summary>
@@ -30,6 +32,8 @@ namespace GpuWatchdog
         /// <summary>Runs the real shutdown on a background thread (the agent closes Salad, then Windows).</summary>
         public Action OnDue;
         public Action Changed;
+        /// <summary>The game that's running right now, or null (from Game Mode's detection).</summary>
+        public Func<string> CurrentGame = () => null;
 
         /// <summary>Seconds a missed time may be late and still run (more means the PC was asleep or the watchdog was off).</summary>
         public const int Grace = 120;
@@ -41,6 +45,7 @@ namespace GpuWatchdog
         public long At { get { lock (g) return s.At; } }
         public bool Cancelled { get { lock (g) return s.Cancelled; } }
         public int Delays { get { lock (g) return s.Delays; } }
+        public bool WaitingForGame { get { lock (g) return s.WaitingForGame; } }
 
         // ---------------- pure time logic (also used by the self-test) ----------------
         public static bool TryTime(string hhmm, out TimeSpan tod)
@@ -66,6 +71,18 @@ namespace GpuWatchdog
             return at - now <= warnSec ? "warn" : "wait";
         }
 
+        /// <summary>
+        /// Decide plus games: "hold" = a game is running at the time (wait for it to close),
+        /// "resume" = the game we waited for has closed (shut down 5 minutes from now, with the usual warning).
+        /// </summary>
+        public static string Step(long now, long at, bool cancelled, bool waitingForGame, bool gameRunning, int warnSec)
+        {
+            if (cancelled || at <= 0) return "wait";
+            if (waitingForGame) return gameRunning ? "hold" : "resume";
+            var d = Decide(now, at, cancelled, warnSec);
+            return d == "due" && gameRunning ? "hold" : d;
+        }
+
         // ---------------- lifecycle ----------------
         public void Start()
         {
@@ -87,7 +104,7 @@ namespace GpuWatchdog
         {
             if (!Enabled) return;
             long at = Time.Epoch(NextLocal(DateTime.Now, Tod()));
-            lock (g) { s.At = at; s.Cancelled = false; s.Delays = 0; s.By = who ?? ""; }
+            lock (g) { s.At = at; s.Cancelled = false; s.Delays = 0; s.By = who ?? ""; s.WaitingForGame = false; }
             Save();
             Log.Info($"Daily shutdown set for {Time.Short(at)}" + (who != null ? $" ({who.ToLowerInvariant()})." : "."));
             Changed?.Invoke();
@@ -97,10 +114,28 @@ namespace GpuWatchdog
         public void Tick(long now)
         {
             if (!Enabled || ShuttingDown) return;
-            long at; bool cancelled;
-            lock (g) { at = s.At; cancelled = s.Cancelled; }
-            var d = Decide(now, at, cancelled, WarnSeconds);
-            if (d == "missed")
+            long at; bool cancelled, waiting;
+            lock (g) { at = s.At; cancelled = s.Cancelled; waiting = s.WaitingForGame; }
+            string game = null;
+            try { game = CurrentGame?.Invoke(); } catch { }
+            var d = Step(now, at, cancelled, waiting, game != null, WarnSeconds);
+            if (d == "hold")
+            {
+                if (waiting) return;
+                lock (g) s.WaitingForGame = true;
+                Save();
+                Log.Info($"It's shutdown time, but {game} is running, so the PC waits until the game is closed.");
+                Changed?.Invoke();
+            }
+            else if (d == "resume")
+            {
+                long when = now + WarnSeconds;
+                lock (g) { s.WaitingForGame = false; s.At = when; }
+                Save();
+                Log.Info($"The game was closed, so the PC shuts down at {Time.Short(when)}.");
+                Changed?.Invoke();
+            }
+            else if (d == "missed")
             {
                 Log.Warn($"The daily shutdown at {Time.Short(at)} was missed (the PC was asleep or the watchdog wasn't running), so the PC stays on now.");
                 Arm(null);
@@ -130,7 +165,7 @@ namespace GpuWatchdog
             {
                 if (s.Cancelled) return (true, "The shutdown is already cancelled.");
                 if (s.At == 0) return (false, "No shutdown is scheduled.");
-                at = s.At; s.Cancelled = true; s.By = who;
+                at = s.At; s.Cancelled = true; s.By = who; s.WaitingForGame = false;
             }
             Save();
             Log.Info($"Shutdown at {Time.Short(at)} cancelled ({who.ToLowerInvariant()}). The PC stays on; the next 7:00 shutdown is set the next time Windows starts.");
@@ -146,7 +181,7 @@ namespace GpuWatchdog
             {
                 if (s.Cancelled || s.At == 0) return (false, "The shutdown is cancelled. Use \"Schedule again\" first.");
                 // pressed while it's already due (Salad closing): count from now, not from the passed time
-                s.At = Math.Max(s.At, Time.Now) + minutes * 60L; s.Delays++; s.By = who; at = s.At;
+                s.At = Math.Max(s.At, Time.Now) + minutes * 60L; s.Delays++; s.By = who; at = s.At; s.WaitingForGame = false;
             }
             Save();
             Log.Info($"Shutdown delayed by {minutes} min to {Time.Short(at)} ({who.ToLowerInvariant()}).");
@@ -177,7 +212,7 @@ namespace GpuWatchdog
                 return new Dictionary<string, object> {
                     { "enabled", Enabled }, { "at", Enabled && s.At > 0 ? (object)s.At : null }, { "cancelled", Enabled && s.Cancelled },
                     { "delays", s.Delays }, { "warnSec", WarnSeconds }, { "busy", ShuttingDown }, { "time", Time.Local(0).Date.Add(Tod()).ToString("HH:mm", Time.Inv) },
-                    { "test", Conf.S.AutoOffDryRun } };
+                    { "test", Conf.S.AutoOffDryRun }, { "waitingForGame", Enabled && s.WaitingForGame } };
         }
 
         /// <summary>The warning window should be open: within the warning time, or while shutting down.</summary>
@@ -185,7 +220,9 @@ namespace GpuWatchdog
         {
             if (!Enabled) return false;
             if (ShuttingDown) return true;
-            lock (g) return Decide(Time.Now, s.At, s.Cancelled, WarnSeconds) == "warn";
+            // never pop up over a game (it could pull a full-screen game out); the website still shows it
+            try { if (CurrentGame?.Invoke() != null) return false; } catch { }
+            lock (g) return !s.WaitingForGame && Decide(Time.Now, s.At, s.Cancelled, WarnSeconds) == "warn";
         }
     }
 

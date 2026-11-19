@@ -244,6 +244,7 @@ function demoCommand(cmd: string, args: Record<string, unknown>) {
 
 /** Demo: the next 07:00 (add ?demo&soon to the address to see the 5-minute warning). */
 function nextSeven() {
+  if (location.search.includes("game")) { setTimeout(() => { demoT.autoOff = { ...demoT.autoOff!, waitingForGame: true, at: Math.floor(Date.now() / 1000) - 60 }; }, 0); }
   if (location.search.includes("soon")) return Math.floor(Date.now() / 1000) + 200;
   const d = new Date(); d.setHours(7, 0, 0, 0); if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
   return Math.floor(d.getTime() / 1000);

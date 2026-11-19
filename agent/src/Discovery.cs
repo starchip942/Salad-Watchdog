@@ -330,6 +330,12 @@ namespace GpuWatchdog
             Eq("1 min late: still due", AutoOff.Decide(at + 60, at, false, 300), "due");
             Eq("woke 3 h late: missed (no shutdown)", AutoOff.Decide(at + 3 * 3600, at, false, 300), "missed");
             Eq("cancelled: never", AutoOff.Decide(at, at, true, 300), "wait");
+            Eq("7:00 while a game runs: hold", AutoOff.Step(at, at, false, false, true, 300), "hold");
+            Eq("still gaming at 9:00: keep holding (not missed)", AutoOff.Step(at + 7200, at, false, true, true, 300), "hold");
+            Eq("game closed: resume (shut down 5 min later)", AutoOff.Step(at + 7200, at, false, true, false, 300), "resume");
+            Eq("no game at 7:00: due", AutoOff.Step(at, at, false, false, false, 300), "due");
+            Eq("game running before 7:00: just wait", AutoOff.Step(at - 3600, at, false, false, true, 300), "wait");
+            Eq("cancelled while waiting: nothing", AutoOff.Step(at + 60, at, true, true, false, 300), "wait");
             Console.WriteLine(fails == 0 ? "ALL AGENT SELF-TESTS PASSED" : fails + " FAILED");
             return fails == 0 ? 0 : 1;
         }

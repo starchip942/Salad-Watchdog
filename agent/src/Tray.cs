@@ -60,7 +60,7 @@ namespace GpuWatchdog
             bool on = Conf.S.AutoOffEnabled, cancelled = off.Cancelled;
             long at = off.At;
             offInfo.Visible = on;
-            offInfo.Text = !on ? "" : cancelled ? "Shutdown: cancelled (until Windows restarts)" : at > 0 ? "Shutdown: " + Time.Local(at).ToString("ddd HH:mm", Time.Inv) + (Conf.S.AutoOffDryRun ? " (test)" : "") : "Shutdown: none";
+            offInfo.Text = !on ? "" : cancelled ? "Shutdown: cancelled (until Windows restarts)" : off.WaitingForGame ? "Shutdown: after the game is closed" : at > 0 ? "Shutdown: " + Time.Local(at).ToString("ddd HH:mm", Time.Inv) + (Conf.S.AutoOffDryRun ? " (test)" : "") : "Shutdown: none";
             offCancel.Visible = offDelay.Visible = on && !cancelled && at > 0;
             offResume.Visible = on && cancelled;
             // shown once per shutdown time: after OK it stays closed (a Delay makes a new time, which warns again)
