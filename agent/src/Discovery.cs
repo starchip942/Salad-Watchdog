@@ -313,6 +313,23 @@ namespace GpuWatchdog
             Eq("wallet balance", wd?.balanceUSD, 4.5365);
             Eq("wallet last 24h", wd?.last24hUSD, 1.6263);
             Eq("wallet no forecast", wd?.estNextHourHighUSD, null);
+            // daily shutdown: the next 7:00 from a few fake "now" times
+            var seven = new TimeSpan(7, 0, 0);
+            string N(DateTime d) => AutoOff.NextLocal(d, seven).ToString("yyyy-MM-dd HH:mm", Time.Inv);
+            Eq("02:00 boot -> 07:00 today", N(new DateTime(2026, 11, 20, 2, 0, 0)), "2026-11-20 07:00");
+            Eq("06:59 -> 07:00 today", N(new DateTime(2026, 11, 20, 6, 59, 0)), "2026-11-20 07:00");
+            Eq("07:00 exactly -> tomorrow", N(new DateTime(2026, 11, 20, 7, 0, 0)), "2026-11-21 07:00");
+            Eq("15:30 manual start -> tomorrow", N(new DateTime(2026, 11, 20, 15, 30, 0)), "2026-11-21 07:00");
+            Eq("23:59 on 31 Dec -> 1 Jan", N(new DateTime(2026, 12, 31, 23, 59, 0)), "2027-01-01 07:00");
+            Eq("time 7:00 parses", AutoOff.TryTime("7:00", out var t7) && t7 == seven, true);
+            Eq("bad time falls back to 07:00", !AutoOff.TryTime("25:00", out var tb) && tb == seven, true);
+            long at = 1000000;
+            Eq("an hour before: wait", AutoOff.Decide(at - 3600, at, false, 300), "wait");
+            Eq("4 min before: warn", AutoOff.Decide(at - 240, at, false, 300), "warn");
+            Eq("at the time: due", AutoOff.Decide(at, at, false, 300), "due");
+            Eq("1 min late: still due", AutoOff.Decide(at + 60, at, false, 300), "due");
+            Eq("woke 3 h late: missed (no shutdown)", AutoOff.Decide(at + 3 * 3600, at, false, 300), "missed");
+            Eq("cancelled: never", AutoOff.Decide(at, at, true, 300), "wait");
             Console.WriteLine(fails == 0 ? "ALL AGENT SELF-TESTS PASSED" : fails + " FAILED");
             return fails == 0 ? 0 : 1;
         }

@@ -25,6 +25,7 @@ namespace GpuWatchdog
         public List<RunningGame> ActiveGames = new List<RunningGame>();
         public Lockout Lock = new Lockout();
         public ScheduleFile Sched = new ScheduleFile();
+        public readonly AutoOff AutoOff = new AutoOff();
         public long ShutdownAt, SleepAt;
         System.Threading.Timer sleepTimer;
         public EarningsData Earn;
@@ -98,6 +99,9 @@ namespace GpuWatchdog
                 Log.Warn($"Missed schedule: {Label(s.Action)} at {Time.Short(s.At)} (the Watchdog wasn't running then). It was not done late.");
             }
             SaveSchedules();
+            AutoOff.OnDue = DailyShutdown;
+            AutoOff.Changed = () => SendTelemetry();
+            AutoOff.Start();
 
             sensors.Open();
             var r = sensors.Read();
@@ -223,6 +227,7 @@ namespace GpuWatchdog
             ChopRetry(now);
             if (chopUntil + chopVerifyUntil != savedChop) { savedChop = chopUntil + chopVerifyUntil; SaveState(); }
             Schedules(now);
+            AutoOff.Tick(now);
             if (ShutdownAt > 0 && now > ShutdownAt + 120) ShutdownAt = 0;
 
             int interval = Relay.Viewers > 0 ? 1 : Math.Max(5, Conf.S.SampleSecondsIdle);
@@ -594,6 +599,17 @@ namespace GpuWatchdog
                     Conf.S.RelayUrl = onDisk.RelayUrl.Trim();
                     Log.Debug("Website relay set to " + Conf.S.RelayUrl + ".");
                 }
+                // daily shutdown settings edited in the file: apply them right away
+                if (onDisk.AutoOffTime != Conf.S.AutoOffTime || onDisk.AutoOffEnabled != Conf.S.AutoOffEnabled
+                    || onDisk.AutoOffWarnMinutes != Conf.S.AutoOffWarnMinutes || onDisk.AutoOffDryRun != Conf.S.AutoOffDryRun)
+                {
+                    bool timeChanged = onDisk.AutoOffTime != Conf.S.AutoOffTime || onDisk.AutoOffEnabled != Conf.S.AutoOffEnabled;
+                    Conf.S.AutoOffTime = onDisk.AutoOffTime; Conf.S.AutoOffEnabled = onDisk.AutoOffEnabled;
+                    Conf.S.AutoOffWarnMinutes = onDisk.AutoOffWarnMinutes; Conf.S.AutoOffDryRun = onDisk.AutoOffDryRun;
+                    Log.Debug($"Daily shutdown settings: {(Conf.S.AutoOffEnabled ? "on" : "off")}, {Conf.S.AutoOffTime}, warning {Conf.S.AutoOffWarnMinutes} min{(Conf.S.AutoOffDryRun ? ", TEST MODE" : "")}.");
+                    if (timeChanged) AutoOff.SettingsChanged();
+                    SendTelemetry();
+                }
             }
             catch { }
             if (updateSignalled) return;
@@ -634,6 +650,50 @@ namespace GpuWatchdog
                 {
                     var r = CloseSalad("Schedule");
                 }
+            }
+        }
+
+        /// <summary>
+        /// The daily shutdown time is here: close Salad properly (force only after ~30 s), then a full Windows shutdown
+        /// (not sleep/hibernate, so the BIOS RTC alarm can wake the PC). Cancel or Delay while Salad closes still stops it.
+        /// </summary>
+        void DailyShutdown()
+        {
+            bool test = Conf.S.AutoOffDryRun;
+            Log.Warn("Daily shutdown: closing Salad, then turning the PC off." + (test ? " (TEST MODE: nothing is really closed or turned off.)" : ""));
+            if (test)
+            {
+                Thread.Sleep(5000);
+                if (!AutoOff.StillDue()) { Log.Info("Test mode: shutdown was stopped in time."); AutoOff.EndShutdown(); return; }
+                Log.Warn("Test mode: here Salad would be closed and Windows shut down (shutdown /s /t 0). Nothing was done.");
+                AutoOff.DoneTest();
+                return;
+            }
+            string res;
+            lock (ActionGate)
+            {
+                chopUntil = 0; chopVerifyUntil = 0; Hold = true; PausedForGame = false; SaveState();   // nothing restarts Salad now
+                res = Salad.Close(30000);
+            }
+            Log.Info("Daily shutdown: " + res);
+            lastSaladCheck = 0; distroRunning = false; UpdateSaladState();
+            if (!AutoOff.StillDue())
+            {
+                Log.Info("The shutdown was cancelled or delayed while Salad was closing, so the PC stays on and Salad starts again.");
+                AutoOff.EndShutdown();
+                ChopNow("Shutdown cancelled");
+                return;
+            }
+            Log.Warn("Daily shutdown: PC turning off now.");
+            ShutdownAt = Time.Now; SendTelemetry();
+            var sd = Proc.System32("shutdown.exe");
+            var o = Proc.Run(sd, "/s /t 0", 15000) ?? "";
+            if (o.Contains("1190")) { Proc.Run(sd, "/a", 8000); o = Proc.Run(sd, "/s /t 0", 15000) ?? ""; }   // a 30-second shutdown was already counting: replace it
+            if (o.Trim().Length > 0)
+            {
+                Log.Error("Windows didn't accept the shutdown: " + o.Trim());
+                ShutdownAt = 0; AutoOff.EndShutdown(); AutoOff.Arm(null);
+                ChopNow("Shutdown failed");
             }
         }
 
@@ -819,6 +879,9 @@ namespace GpuWatchdog
                 case "afterburner_profile": { var r = Afterburner.Apply((int)(Json.Num(args, "profile") ?? 0), w); SendTelemetry(); return r; }
                 case "schedule_add": return AddSchedule(args, w);
                 case "schedule_cancel": return CancelSchedule(Json.Str(args, "id"), w);
+                case "auto_off_cancel": return AutoOff.Cancel(w);
+                case "auto_off_delay": return AutoOff.Delay(w);
+                case "auto_off_resume": return AutoOff.Resume(w);
             }
             return (false, "Unknown command.");
         }
@@ -988,6 +1051,7 @@ namespace GpuWatchdog
                     { "lockout", Lock.Active ? new Dictionary<string, object> { { "at", Lock.At }, { "tempC", Lock.TempC }, { "sensor", Lock.Sensor } } : null } } },
                 { "afterburner", Afterburner.Info() },
                 { "shutdown", new Dictionary<string, object> { { "pendingAt", ShutdownAt > 0 ? (object)ShutdownAt : SleepAt > 0 ? (object)SleepAt : null }, { "kind", ShutdownAt > 0 ? "off" : SleepAt > 0 ? "sleep" : null } } },
+                { "autoOff", AutoOff.Info() },
                 { "schedules", sched.Select(x => new Dictionary<string, object> { { "id", x.Id }, { "action", x.Action }, { "at", x.At }, { "missed", x.Missed } }).ToList() },
             };
             return t;

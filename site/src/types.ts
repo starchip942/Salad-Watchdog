@@ -26,6 +26,8 @@ export interface Telemetry {
              lockout: null | { at: number; tempC: number; sensor: string } };
   afterburner?: { available: boolean; profile: number | null; names: string[] };
   shutdown?: { pendingAt: number | null; kind?: "off" | "sleep" | null };
+  /** Daily shutdown (e.g. 07:00): set again every time the PC starts; cancel skips only this one. */
+  autoOff?: { enabled: boolean; at: number | null; cancelled: boolean; delays: number; warnSec: number; busy: boolean; time: string; test?: boolean };
   schedules: Schedule[];
 }
 

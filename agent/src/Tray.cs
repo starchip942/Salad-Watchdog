@@ -14,7 +14,12 @@ namespace GpuWatchdog
         readonly ToolStripMenuItem status = new ToolStripMenuItem { Enabled = false };
         readonly ToolStripMenuItem relay = new ToolStripMenuItem { Enabled = false };
         readonly ToolStripMenuItem salad = new ToolStripMenuItem { Enabled = false };
-        readonly Timer timer = new Timer { Interval = 2000 };
+        readonly ToolStripMenuItem offInfo = new ToolStripMenuItem { Enabled = false };
+        readonly ToolStripMenuItem offCancel = new ToolStripMenuItem("Cancel shutdown");
+        readonly ToolStripMenuItem offDelay = new ToolStripMenuItem("Delay shutdown 1 hour");
+        readonly ToolStripMenuItem offResume = new ToolStripMenuItem("Schedule shutdown again");
+        AutoOffWindow offWindow;
+        readonly Timer timer = new Timer { Interval = 1000 };
         IntPtr iconHandle = IntPtr.Zero;
         string lastIconText = "";
 
@@ -24,6 +29,12 @@ namespace GpuWatchdog
             ui.CreateControl();
             var menu = new ContextMenuStrip();
             menu.Items.Add(status); menu.Items.Add(salad); menu.Items.Add(relay);
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(offInfo); menu.Items.Add(offCancel); menu.Items.Add(offDelay); menu.Items.Add(offResume);
+            offCancel.Click += (s, e) => { var r = agent.AutoOff.Cancel("Tray"); Balloon("GPU Watchdog", r.msg, ToolTipIcon.Info); Refresh(); };
+            offDelay.Click += (s, e) => { var r = agent.AutoOff.Delay("Tray"); Balloon("GPU Watchdog", r.msg, ToolTipIcon.Info); Refresh(); };
+            offResume.Click += (s, e) => { var r = agent.AutoOff.Resume("Tray"); Balloon("GPU Watchdog", r.msg, ToolTipIcon.Info); Refresh(); };
+            menu.Opening += (s, e) => Refresh();
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Open panel", null, (s, e) => panel.Open()).Font = new Font(menu.Font, FontStyle.Bold);
             menu.Items.Add("Open log", null, (s, e) => { try { System.Diagnostics.Process.Start("notepad.exe", "\"" + Log.FilePath + "\""); } catch { } });
@@ -39,10 +50,33 @@ namespace GpuWatchdog
 
         public void Invoke(Action a) { try { if (ui.InvokeRequired) ui.BeginInvoke(a); else a(); } catch { } }
 
-        public void Balloon(string title, string text) => Invoke(() => icon.ShowBalloonTip(8000, title, text, ToolTipIcon.Warning));
+        public void Balloon(string title, string text) => Balloon(title, text, ToolTipIcon.Warning);
+        void Balloon(string title, string text, ToolTipIcon kind) => Invoke(() => icon.ShowBalloonTip(8000, title, text, kind));
+
+        /// <summary>Daily shutdown: tray lines, and the big warning window from 5 minutes before.</summary>
+        void RefreshAutoOff()
+        {
+            var off = agent.AutoOff;
+            bool on = Conf.S.AutoOffEnabled, cancelled = off.Cancelled;
+            long at = off.At;
+            offInfo.Visible = on;
+            offInfo.Text = !on ? "" : cancelled ? "Shutdown: cancelled (until Windows restarts)" : at > 0 ? "Shutdown: " + Time.Local(at).ToString("ddd HH:mm", Time.Inv) + (Conf.S.AutoOffDryRun ? " (test)" : "") : "Shutdown: none";
+            offCancel.Visible = offDelay.Visible = on && !cancelled && at > 0;
+            offResume.Visible = on && cancelled;
+            if (off.ShowWarning())
+            {
+                if (offWindow == null || offWindow.IsDisposed)
+                {
+                    offWindow = new AutoOffWindow(off);
+                    offWindow.Show();
+                    Log.Debug("Shutdown warning shown on the PC.");
+                }
+            }
+        }
 
         void Refresh()
         {
+            try { RefreshAutoOff(); } catch (Exception e) { Log.Debug("Shutdown warning: " + e.Message); }
             var r = agent.Last;
             var t = r.GpuTemp;
             var lim = Conf.S.SafetyCoreLimitC;
