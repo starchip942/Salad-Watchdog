@@ -18,7 +18,7 @@ namespace GpuWatchdog
         readonly ToolStripMenuItem offCancel = new ToolStripMenuItem("Cancel shutdown");
         readonly ToolStripMenuItem offDelay = new ToolStripMenuItem("Delay shutdown 1 hour");
         readonly ToolStripMenuItem offResume = new ToolStripMenuItem("Schedule shutdown again");
-        AutoOffWindow offWindow;
+        AutoOffWindow offWindow; long offShownFor;
         readonly Timer timer = new Timer { Interval = 1000 };
         IntPtr iconHandle = IntPtr.Zero;
         string lastIconText = "";
@@ -63,10 +63,12 @@ namespace GpuWatchdog
             offInfo.Text = !on ? "" : cancelled ? "Shutdown: cancelled (until Windows restarts)" : at > 0 ? "Shutdown: " + Time.Local(at).ToString("ddd HH:mm", Time.Inv) + (Conf.S.AutoOffDryRun ? " (test)" : "") : "Shutdown: none";
             offCancel.Visible = offDelay.Visible = on && !cancelled && at > 0;
             offResume.Visible = on && cancelled;
-            if (off.ShowWarning())
+            // shown once per shutdown time: after OK it stays closed (a Delay makes a new time, which warns again)
+            if (off.ShowWarning() && at != offShownFor)
             {
                 if (offWindow == null || offWindow.IsDisposed)
                 {
+                    offShownFor = at;
                     offWindow = new AutoOffWindow(off);
                     offWindow.Show();
                     Log.Debug("Shutdown warning shown on the PC.");

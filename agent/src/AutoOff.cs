@@ -189,62 +189,52 @@ namespace GpuWatchdog
         }
     }
 
-    /// <summary>The big always-on-top "This PC will shut down at 7:00" window with a live countdown.</summary>
+    /// <summary>
+    /// A calm, plain warning in the normal Windows style: "This PC will shut down in 5 minutes." with OK, Delay 1 hour and
+    /// Cancel shutdown. OK (or the X) just closes the message; the shutdown goes ahead. Stays on top so it isn't missed.
+    /// </summary>
     sealed class AutoOffWindow : Form
     {
         readonly AutoOff off;
-        readonly Label title = new Label(), count = new Label(), note = new Label();
-        readonly Button cancel = new Button(), delay = new Button();
-        readonly Timer timer = new Timer { Interval = 500 };
+        readonly Timer timer = new Timer { Interval = 1000 };
+        /// <summary>The shutdown time this window is about; pressing OK hides the warning for that time only.</summary>
+        public readonly long For;
 
         public AutoOffWindow(AutoOff o)
         {
-            off = o;
-            Text = "GPU Watchdog: shutdown";
-            FormBorderStyle = FormBorderStyle.FixedDialog; MaximizeBox = false; MinimizeBox = false; ControlBox = false;
+            off = o; For = o.At;
+            Text = "GPU Watchdog";
+            FormBorderStyle = FormBorderStyle.FixedDialog; MaximizeBox = false; MinimizeBox = false;
             StartPosition = FormStartPosition.CenterScreen; TopMost = true; ShowInTaskbar = true;
-            BackColor = Color.FromArgb(24, 24, 28); ForeColor = Color.White;
-            AutoScaleMode = AutoScaleMode.Dpi; ClientSize = new Size(760, 400);
+            AutoScaleMode = AutoScaleMode.Dpi; Font = new Font("Segoe UI", 10.5f);
+            BackColor = SystemColors.Window;
+            ClientSize = new Size(440, 150);
             try { Icon = Icon.ExtractAssociatedIcon(System.Reflection.Assembly.GetExecutingAssembly().Location); } catch { }
 
-            title.Font = new Font("Segoe UI Semibold", 26f); title.AutoSize = false; title.TextAlign = ContentAlignment.MiddleCenter;
-            title.SetBounds(20, 24, 720, 60);
-            count.Font = new Font("Segoe UI", 54f, FontStyle.Bold); count.AutoSize = false; count.TextAlign = ContentAlignment.MiddleCenter;
-            count.ForeColor = Color.FromArgb(255, 110, 120); count.SetBounds(20, 90, 720, 110);
-            note.Font = new Font("Segoe UI", 12.5f); note.AutoSize = false; note.TextAlign = ContentAlignment.MiddleCenter;
-            note.ForeColor = Color.FromArgb(200, 200, 210); note.SetBounds(20, 205, 720, 60);
-
-            Style(cancel, "Cancel shutdown", Color.FromArgb(60, 60, 70)); cancel.SetBounds(70, 290, 300, 72);
-            Style(delay, "Delay 1 hour", Color.FromArgb(40, 120, 220)); delay.SetBounds(390, 290, 300, 72);
-            cancel.Click += (s, e) => { off.Cancel("PC"); Close(); };
-            delay.Click += (s, e) => { off.Delay("PC"); Close(); };
-            Controls.AddRange(new Control[] { title, count, note, cancel, delay });
-            timer.Tick += (s, e) => Draw();
-            Draw();
-            timer.Start();
-        }
-
-        static void Style(Button b, string text, Color back)
-        {
-            b.Text = text; b.Font = new Font("Segoe UI Semibold", 16f); b.FlatStyle = FlatStyle.Flat; b.FlatAppearance.BorderSize = 0;
-            b.BackColor = back; b.ForeColor = Color.White; b.Cursor = Cursors.Hand; b.UseVisualStyleBackColor = false;
-        }
-
-        void Draw()
-        {
-            if (!off.ShowWarning()) { if (IsHandleCreated) Close(); return; }
-            var at = off.At;
-            title.Text = "This PC will shut down at " + Time.Local(at).ToString("HH:mm", Time.Inv);
-            if (off.ShuttingDown)
+            long mins = Math.Max(1, (long)Math.Ceiling(Math.Max(0, For - Time.Now) / 60.0));
+            var text = new Label
             {
-                count.Text = "Shutting down…"; if (count.Font.Size > 40) count.Font = new Font("Segoe UI", 36f, FontStyle.Bold);
-                note.Text = "Closing Salad, then turning the PC off." + (Conf.S.AutoOffDryRun ? " (Test mode: it won't really turn off.)" : "");
-                cancel.Enabled = delay.Enabled = true;   // still possible while Salad closes
-                return;
-            }
-            var left = Math.Max(0, at - Time.Now);
-            count.Text = $"{left / 60}:{left % 60:00}";
-            note.Text = "Salad will be closed first. Cancel skips only this shutdown; Delay moves it 1 hour later." + (Conf.S.AutoOffDryRun ? "\n(Test mode: it won't really turn off.)" : "");
+                AutoSize = false, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI", 12f),
+                Text = $"This PC will shut down in {mins} minute{(mins == 1 ? "" : "s")}." + (Conf.S.AutoOffDryRun ? "\n(Test: it won't really shut down.)" : ""),
+            };
+            text.SetBounds(24, 18, 392, 64);
+
+            var bar = new Panel { BackColor = SystemColors.Control };
+            bar.SetBounds(0, 96, 440, 54);
+            var ok = new Button { Text = "OK", DialogResult = DialogResult.OK, UseVisualStyleBackColor = true };
+            var delay = new Button { Text = "Delay 1 hour", UseVisualStyleBackColor = true };
+            var cancel = new Button { Text = "Cancel shutdown", UseVisualStyleBackColor = true };
+            ok.SetBounds(18, 12, 96, 30); delay.SetBounds(124, 12, 136, 30); cancel.SetBounds(270, 12, 152, 30);
+            ok.Click += (s, e) => Close();
+            delay.Click += (s, e) => { off.Delay("PC"); Close(); };
+            cancel.Click += (s, e) => { off.Cancel("PC"); Close(); };
+            bar.Controls.AddRange(new Control[] { ok, delay, cancel });
+            Controls.AddRange(new Control[] { text, bar });
+            AcceptButton = ok;
+
+            // closes by itself once it no longer applies (cancelled or delayed elsewhere, e.g. from the phone)
+            timer.Tick += (s, e) => { if (!off.ShowWarning() || off.At != For) Close(); };
+            timer.Start();
         }
 
         protected override void OnShown(EventArgs e) { base.OnShown(e); Activate(); }

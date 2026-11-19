@@ -21,6 +21,7 @@ const S = {
   skew: 0,                          // PC clock minus this phone's clock (s), so countdowns match the PC
 };
 const pcNow = () => Date.now() / 1000 + S.skew;
+let aoDismissed = 0;   // the shutdown time whose warning was closed with OK on this phone
 const tz = () => S.t?.pc?.tz;
 
 // ---------------- hero ----------------
@@ -161,10 +162,10 @@ function renderBanners() {
   if (lo) out.push(`<div class="banner red"><b>⚠ Salad locked out at ${Math.round(lo.tempC)} °C · ${pcTime(lo.at, tz(), true)}</b>Check cooling (fans, dust, airflow). Clear it on the PC.</div>`);
   if (t?.safety?.sensorFail) out.push(`<div class="banner amber"><b>GPU temperature can't be read</b>The safety stop won't act on missing data. Check the PC.</div>`);
   const ao = t?.autoOff;
-  if (S.online && ao?.enabled && ao.at && !ao.cancelled && (ao.busy || ao.at - pcNow() <= ao.warnSec)) {
-    const left = Math.max(0, Math.round(ao.at - pcNow()));
-    const when = ao.busy || left === 0 ? "Shutting down now: closing Salad, then the PC." : `in <span class="num">${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}</span>`;
-    out.push(`<div class="banner red"><b>This PC will shut down at ${pcTime(ao.at, tz())}${ao.test ? " (test)" : ""}</b>${when}<div class="row-btns"><button class="btn white" data-cmd="auto_off_cancel">Cancel shutdown</button><button class="btn" data-cmd="auto_off_delay">Delay 1 hour</button></div></div>`);
+  if (S.online && ao?.enabled && ao.at && !ao.cancelled && ao.at !== aoDismissed && (ao.busy || ao.at - pcNow() <= ao.warnSec)) {
+    const mins = Math.max(1, Math.ceil((ao.at - pcNow()) / 60));
+    const when = ao.busy || ao.at <= pcNow() ? "This PC is shutting down now." : `This PC will shut down in ${mins} minute${mins === 1 ? "" : "s"}.`;
+    out.push(`<div class="banner grey"><b>${when}${ao.test ? " (test)" : ""}</b><div class="row-btns"><button class="btn" data-cmd="auto_off_ok">OK</button><button class="btn" data-cmd="auto_off_delay">Delay 1 hour</button><button class="btn" data-cmd="auto_off_cancel">Cancel shutdown</button></div></div>`);
   }
   const pend = t?.shutdown?.pendingAt;
   if (S.online && pend && pend * 1000 > Date.now()) {
@@ -304,6 +305,7 @@ document.addEventListener("click", e => {
   if (cmd === "schedule") { openSchedule(); return; }
   if (cmd === "confirm_pc_off") { closeSheet(); run("pc_off_now"); return; }
   if (cmd === "close") { closeSheet(); return; }
+  if (cmd === "auto_off_ok") { aoDismissed = S.t?.autoOff?.at ?? 0; renderBanners(); return; }
   run(cmd);
 });
 
