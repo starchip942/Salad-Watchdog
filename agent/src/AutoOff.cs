@@ -219,7 +219,7 @@ namespace GpuWatchdog
             };
             text.SetBounds(24, 18, 392, 64);
 
-            var bar = new Panel { BackColor = SystemColors.Control };
+            var bar = new System.Windows.Forms.Panel { BackColor = SystemColors.Control };
             bar.SetBounds(0, 96, 440, 54);
             var ok = new Button { Text = "OK", DialogResult = DialogResult.OK, UseVisualStyleBackColor = true };
             var delay = new Button { Text = "Delay 1 hour", UseVisualStyleBackColor = true };
