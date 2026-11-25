@@ -24,6 +24,10 @@ It works from anywhere: mobile data, other Wi-Fi networks, other countries. Your
 | **PC off now** | Windows shuts down after a 30-second countdown that you can cancel. **Once the PC is off, it can't be turned back on from the website.** |
 | **Lights & Screen Off** *(PC panel only)* | Turns the SignalRGB lights off right away, then the monitors 20 seconds later. The PC keeps running and earning. Move the mouse to wake the screen. |
 
+**Daily shutdown (7:00 AM):** every time the PC starts, the watchdog sets a shutdown for the next 7:00 AM. You can always see it on the website ("Shutdown: 07:00") and in the tray menu. At 6:55 a small message appears on the PC ("This PC will shut down in 5 minutes."), and the same on the website, with **OK** (just closes the message), **Delay 1 hour** (press it as often as you like) and **Cancel shutdown** (skips only this one; the next start sets 7:00 again). At 7:00 Salad is closed properly and the PC turns fully off, so the BIOS alarm can turn it on again at 2:00 AM. If a game is running at 7:00, the PC waits until the game is closed and then shuts down 5 minutes later (the website shows "after the game is closed"; the PC message never pops up over a game). If the PC was asleep at 7:00, it doesn't shut down late; it waits for the next day. To turn it on or off, or change the time (7:00 AM by default) or how early the warning comes, go to the PC panel → **Safety & Settings** → **Daily shutdown** and press **Save**. The settings are kept in `config\agent.config.json` (`AutoOffEnabled`, `AutoOffTime`, `AutoOffWarnMinutes`), so they stay after restarts.
+
+**Salad's tray icon:** the watchdog hides Salad's own tray icon by default (Salad keeps running in the background). To see the icon again, turn off **Hide Salad's tray icon** in the PC panel → **Safety & Settings** → **General** and press **Save**. This also stays after restarts.
+
 **What a "hold" means:** after you pause or close Salad yourself, Game Mode won't restart it. Press **Chop Now** (or **Clear hold** in the panel) when you want it back.
 
 ## 4. Safety stop

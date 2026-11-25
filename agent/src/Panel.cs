@@ -108,6 +108,7 @@ namespace GpuWatchdog
                             { "screenOffDelaySec", s.ScreenOffDelaySec }, { "screenOffEvenIfLightsFail", s.ScreenOffEvenIfLightsFail },
                             { "showEarningsOnWebsite", s.ShowEarningsOnWebsite }, { "viewRequiresPassword", s.ViewRequiresPassword },
                             { "startHiddenInTray", s.StartHiddenInTray }, { "hideSaladTrayIcon", s.HideSaladTrayIcon }, { "sampleSecondsIdle", s.SampleSecondsIdle },
+                            { "autoOffEnabled", s.AutoOffEnabled }, { "autoOffTime", s.AutoOffTime }, { "autoOffWarnMinutes", s.AutoOffWarnMinutes },
                             { "relayUrl", s.RelayUrl }, { "dataFolder", Paths.Root } } },
                         { "hold", a.Hold }, { "pausedForGame", a.PausedForGame }, { "oldWatchdog", a.OldWatchdogRunning }, { "pauseUnsupported", a.PauseUnsupported },
                         { "lockout", a.Lock.Active ? new Dictionary<string, object> { { "at", a.Lock.At }, { "tempC", a.Lock.TempC }, { "sensor", a.Lock.Sensor }, { "temps", a.Lock.RecentTemps } } : null },
@@ -213,6 +214,8 @@ namespace GpuWatchdog
             var s = Conf.S; var changes = new List<string>();
             int Int(string k, int v, int lo, int hi) { var n = Json.Num(a, k); if (n == null) return v; var c = (int)Math.Max(lo, Math.Min(hi, n.Value)); if (c != v) changes.Add(k); return c; }
             bool B(string k, bool v) { var n = Json.Bool(a, k); if (n == null) return v; if (n.Value != v) changes.Add(k); return n.Value; }
+            var offTime = Json.Str(a, "autoOffTime"); TimeSpan offTod = default;
+            if (offTime != null && !AutoOff.TryTime(offTime, out offTod)) return (false, "Shutdown time must look like 07:00 (24-hour clock).");
             s.SafetyEnabled = B("safetyEnabled", s.SafetyEnabled);
             var sensor = Json.Str(a, "safetySensor");
             if (sensor == "core" || sensor == "hotspot" || sensor == "either") { if (sensor != s.SafetySensor) changes.Add("safetySensor"); s.SafetySensor = sensor; }
@@ -235,8 +238,19 @@ namespace GpuWatchdog
             s.SampleSecondsIdle = Int("sampleSecondsIdle", s.SampleSecondsIdle, 5, 60);
             var url = Json.Str(a, "relayUrl");
             if (url != null && url.Trim() != s.RelayUrl) { s.RelayUrl = url.Trim(); changes.Add("relayUrl"); }
+            // daily shutdown: on/off, time (HH:mm, local) and how early the warning appears
+            s.AutoOffEnabled = B("autoOffEnabled", s.AutoOffEnabled);
+            if (offTime != null) { var hhmm = offTod.ToString(@"hh\:mm"); if (hhmm != s.AutoOffTime) { s.AutoOffTime = hhmm; changes.Add("autoOffTime"); } }
+            s.AutoOffWarnMinutes = Int("autoOffWarnMinutes", s.AutoOffWarnMinutes, 1, 60);
             Conf.Save();
             if (changes.Count == 0) return (true, "No changes.");
+            if (changes.Any(c => c.StartsWith("autoOff")))
+            {
+                Log.Info($"Daily shutdown settings changed on the PC: {(s.AutoOffEnabled ? "on, " + s.AutoOffTime : "off")}, warning {s.AutoOffWarnMinutes} min.");
+                // switched on here: set the next shutdown now, even if one was cancelled earlier in this Windows session
+                if (changes.Contains("autoOffEnabled") && s.AutoOffEnabled) Agent.I.AutoOff.Arm("PC panel");
+                else if (changes.Contains("autoOffEnabled") || changes.Contains("autoOffTime")) Agent.I.AutoOff.SettingsChanged();
+            }
             if (changes.Any(c => c.StartsWith("safety"))) Log.Info($"Safety settings changed on the PC: {(s.SafetyEnabled ? "on" : "OFF")}, sensor {s.SafetySensor}, core {s.SafetyCoreLimitC} °C, hotspot {s.SafetyHotspotLimitC} °C, CPU {s.SafetyCpuLimitC} °C, {s.SafetySamples} readings.");
             if (changes.Contains("importSteam") || changes.Contains("importGameFolders")) Games.Rescan(true);
             if (vr != s.ViewRequiresPassword) Agent.I.Relay.Send(new Dictionary<string, object> { { "type", "info" }, { "viewRequiresPassword", s.ViewRequiresPassword } });

@@ -179,6 +179,7 @@ function startDemo(h: Handlers) {
     safety: { limitC: 85, sensor: "core", lockout: null },
     afterburner: { available: true, profile: 1, names: ["Undervolt", "Stock"] },
     shutdown: { pendingAt: null },
+    autoOff: { enabled: true, at: nextSeven(), cancelled: false, delays: 0, warnSec: 300, busy: false, time: "07:00" },
     schedules: [],
   };
   const hist: HistPoint[] = [];
@@ -231,9 +232,20 @@ function demoCommand(cmd: string, args: Record<string, unknown>) {
     case "task_kill": return Promise.resolve({ ok: true, msg: "Closed " + String(args.name) + "." });
     case "tasks_list": return Promise.resolve({ ok: true, msg: JSON.stringify({ tasks: [{ n: "Salad jobs (Linux: salad-enterprise-linux)", c: 1, mb: null, cpu: null, gpu: null, k: "salad", nokill: true }, { n: "KingdomCome", c: 1, mb: 9300, cpu: 22.5, gpu: 61, k: "game" }, { n: "vmmemWSL", c: 1, mb: 12800, cpu: 3.1, gpu: 35, k: "salad" }, { n: "brave", c: 14, mb: 1900, cpu: 1.2, gpu: 0.4, k: null }, { n: "Salad", c: 5, mb: 420, cpu: 0.3, gpu: 0, k: "salad" }] }) });
     case "lights_off": msg = "Lights off. Screen turns off in 20 s."; break;
+    case "auto_off_cancel": demoT.autoOff = { ...demoT.autoOff!, cancelled: true }; msg = "Shutdown cancelled. The PC stays on until you turn it off."; break;
+    case "auto_off_delay": demoT.autoOff = { ...demoT.autoOff!, at: Math.max(demoT.autoOff!.at ?? now, now) + 3600, delays: demoT.autoOff!.delays + 1 }; msg = "Shutdown delayed by 1 hour."; break;
+    case "auto_off_resume": demoT.autoOff = { ...demoT.autoOff!, at: nextSeven(), cancelled: false, delays: 0 }; msg = "Shutdown set for 07:00."; break;
     case "schedule_cancel": demoT.schedules = demoT.schedules.filter(x => x.id !== args.id); msg = "Schedule cancelled."; break;
   }
   ev(`Website: ${msg}`);
   demoH.telemetry(structuredClone(demoT));
   return Promise.resolve({ ok: true, msg });
+}
+
+/** Demo: the next 07:00 (add ?demo&soon to the address to see the 5-minute warning). */
+function nextSeven() {
+  if (location.search.includes("game")) { setTimeout(() => { demoT.autoOff = { ...demoT.autoOff!, waitingForGame: true, at: Math.floor(Date.now() / 1000) - 60 }; }, 0); }
+  if (location.search.includes("soon")) return Math.floor(Date.now() / 1000) + 200;
+  const d = new Date(); d.setHours(7, 0, 0, 0); if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
+  return Math.floor(d.getTime() / 1000);
 }
