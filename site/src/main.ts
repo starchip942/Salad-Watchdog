@@ -21,7 +21,6 @@ const S = {
   skew: 0,                          // PC clock minus this phone's clock (s), so countdowns match the PC
 };
 const pcNow = () => Date.now() / 1000 + S.skew;
-let aoDismissed = 0;   // the shutdown time whose warning was closed with OK on this phone
 const tz = () => S.t?.pc?.tz;
 
 // ---------------- hero ----------------
@@ -126,7 +125,6 @@ function render() {
   (document.querySelector('[data-cmd="salad_chop_now"]') as HTMLButtonElement).disabled = s.state === "locked_out";
 
   renderSchedules();
-  renderAutoOff();
   const ab = t.afterburner;
   document.querySelectorAll<HTMLButtonElement>("[data-ab]").forEach(b => {
     const n = Number(b.dataset.ab);
@@ -161,12 +159,6 @@ function renderBanners() {
   const lo = t?.safety?.lockout;
   if (lo) out.push(`<div class="banner red"><b>⚠ Salad locked out at ${Math.round(lo.tempC)} °C · ${pcTime(lo.at, tz(), true)}</b>Check cooling (fans, dust, airflow). Clear it on the PC.</div>`);
   if (t?.safety?.sensorFail) out.push(`<div class="banner amber"><b>GPU temperature can't be read</b>The safety stop won't act on missing data. Check the PC.</div>`);
-  const ao = t?.autoOff;
-  if (S.online && ao?.enabled && ao.at && !ao.cancelled && !ao.waitingForGame && ao.at !== aoDismissed && (ao.busy || ao.at - pcNow() <= ao.warnSec)) {
-    const mins = Math.max(1, Math.ceil((ao.at - pcNow()) / 60));
-    const when = ao.busy || ao.at <= pcNow() ? "This PC is shutting down now." : `This PC will shut down in ${mins} minute${mins === 1 ? "" : "s"}.`;
-    out.push(`<div class="banner grey"><b>${when}${ao.test ? " (test)" : ""}</b><div class="row-btns"><button class="btn" data-cmd="auto_off_ok">OK</button><button class="btn" data-cmd="auto_off_delay">Delay 1 hour</button><button class="btn" data-cmd="auto_off_cancel">Cancel shutdown</button></div></div>`);
-  }
   const pend = t?.shutdown?.pendingAt;
   if (S.online && pend && pend * 1000 > Date.now()) {
     const left = Math.max(0, Math.round(pend - Date.now() / 1000));
@@ -178,25 +170,9 @@ function renderBanners() {
   if (b.innerHTML !== html) b.innerHTML = html;
 }
 
-/** Always visible: when the PC turns itself off next (or that it was cancelled for this time). */
-function renderAutoOff() {
-  const ao = S.t?.autoOff, el = $("auto-off");
-  el.hidden = !ao?.enabled;
-  if (!ao?.enabled) return;
-  const soon = !!ao.at && !ao.cancelled && !ao.waitingForGame && ao.at - pcNow() <= ao.warnSec;
-  const day = !!ao.at && ao.at - pcNow() > 20 * 3600;
-  const html = ao.cancelled ? `Shutdown: <b>Cancelled</b>` : ao.waitingForGame ? `Shutdown: <b>after the game is closed</b>` : ao.at ? `Shutdown: <b>${pcTime(ao.at, tz(), day)}</b>${ao.test ? " (test)" : ""}` : `Shutdown: <b>none</b>`;
-  if (el.innerHTML !== html) el.innerHTML = html;
-  el.className = "autooff" + (ao.cancelled ? " off" : soon ? " soon" : "");
-}
-
 function renderSchedules() {
   const list = S.t?.schedules ?? [];
-  const ao = S.t?.autoOff;
-  const daily = !ao?.enabled ? "" : ao.cancelled
-    ? `<div class="sched-item"><span>Daily shutdown · cancelled this time</span><span class="sbtns"><button class="btn" data-cmd="auto_off_resume">Schedule again</button></span></div>`
-    : ao.at ? `<div class="sched-item"><span>Daily shutdown · ${ao.waitingForGame ? "after the game is closed" : pcTime(ao.at, tz(), true)}${ao.delays ? ` · delayed ${ao.delays}×` : ""}</span><span class="sbtns"><button class="btn" data-cmd="auto_off_delay">+1 h</button><button class="btn" data-cmd="auto_off_cancel">Cancel</button></span></div>` : "";
-  $("sched-list").innerHTML = daily + list.map(s => `<div class="sched-item"><span>${s.action === "pc_off" ? "Turn PC off" : s.action === "pc_sleep" ? "Sleep PC" : "Close Salad"} · ${pcTime(s.at, tz(), true)}${s.missed ? " · missed" : ""}</span><button class="x" data-cancel="${esc(s.id)}" aria-label="Cancel this schedule">✕</button></div>`).join("");
+  $("sched-list").innerHTML = list.map(s => `<div class="sched-item"><span>${s.action === "pc_off" ? "Turn PC off" : s.action === "pc_sleep" ? "Sleep PC" : "Close Salad"} · ${pcTime(s.at, tz(), true)}${s.missed ? " · missed" : ""}</span><button class="x" data-cancel="${esc(s.id)}" aria-label="Cancel this schedule">✕</button></div>`).join("");
 }
 
 // ---------------- logs (three separate logs, in a sheet) ----------------
@@ -305,7 +281,6 @@ document.addEventListener("click", e => {
   if (cmd === "schedule") { openSchedule(); return; }
   if (cmd === "confirm_pc_off") { closeSheet(); run("pc_off_now"); return; }
   if (cmd === "close") { closeSheet(); return; }
-  if (cmd === "auto_off_ok") { aoDismissed = S.t?.autoOff?.at ?? 0; renderBanners(); return; }
   run(cmd);
 });
 
@@ -423,7 +398,7 @@ new Live({
 }).start();
 
 // keep "last seen", countdowns and session time fresh
-setInterval(() => { renderStatus(); renderBanners(); renderAutoOff(); renderLock(); }, 1000);
+setInterval(() => { renderStatus(); renderBanners(); renderLock(); }, 1000);
 renderLock();
 renderLog();
 $("foot").innerHTML = "";

@@ -410,12 +410,7 @@ async function refresh() {
   $("tz").textContent = "PC time zone: " + t.pc.tz;
   $("g-active").textContent = S.games.active.length ? S.games.active.join(", ") : "no game";
 
-  // the daily shutdown (07:00) is always listed first, with its own buttons
-  const ao = t.autoOff;
-  const daily = !ao || !ao.enabled ? "" : `<div class="li"><span>Daily shutdown · ${ao.cancelled ? "cancelled (the next start sets it again)" : ao.waitingForGame ? "after the game is closed" : ao.at ? fmtT(ao.at) : "not set"}${ao.test ? ' <span class="tag run">test</span>' : ""}</span><span>${ao.cancelled || !ao.at
-      ? `<button class="chip" data-cmd="auto_off_resume">Schedule again</button>`
-      : `<button class="chip" data-cmd="auto_off_delay">+1 h</button> <button class="chip" data-cmd="auto_off_cancel">Cancel</button>`}</span></div>`;
-  const sched = daily + t.schedules.map(x => `<div class="li"><span>${x.action === "pc_off" ? "Turn PC off" : x.action === "pc_sleep" ? "Sleep PC" : "Close Salad"} · ${fmtT(x.at)}${x.missed ? ' <span class="tag run">missed</span>' : ""}</span><button class="chip" data-cancel="${esc(x.id)}">✕</button></div>`).join("");
+  const sched = t.schedules.map(x => `<div class="li"><span>${x.action === "pc_off" ? "Turn PC off" : x.action === "pc_sleep" ? "Sleep PC" : "Close Salad"} · ${fmtT(x.at)}${x.missed ? ' <span class="tag run">missed</span>' : ""}</span><button class="chip" data-cancel="${esc(x.id)}">✕</button></div>`).join("");
   $("o-sched").innerHTML = sched || `<div style="color:var(--dim);font-size:12.5px">None</div>`;
   $("s-list").innerHTML = sched || `<div style="color:var(--dim);font-size:12.5px">Nothing scheduled.</div>`;
 

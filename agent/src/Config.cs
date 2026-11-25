@@ -35,12 +35,6 @@ namespace GpuWatchdog
         // after Windows starts: open Salad and Chop Now by itself (only right after a boot, never when the watchdog just restarts)
         public bool ChopOnStartup = true;
 
-        // daily shutdown: closes Salad and turns the PC fully off at this time (local), every day; set again at every start
-        public bool AutoOffEnabled = true;
-        public string AutoOffTime = "07:00";
-        public int AutoOffWarnMinutes = 5;      // the warning window (PC) and banner (website) appear this long before
-        public bool AutoOffDryRun = false;      // test only: log the shutdown instead of closing Salad and turning the PC off
-
         // game mode
         public bool GameModeEnabled = true;
         public string AfterburnerProfile1Name = "Undervolt", AfterburnerProfile2Name = "Stock";
