@@ -112,7 +112,11 @@ namespace GpuWatchdog
             if (Lock.Active) Log.Error($"Emergency lockout is still active (GPU reached {Lock.TempC:0} °C at {Time.Short(Lock.At)}). Salad stays off until you clear it in the panel.");
             if (Hold) Log.Info("Salad hold still active from earlier: it won't restart after games until you press Start chopping.");
             Games.Rescan(true);
-            if (Conf.S.ChopOnStartup && Time.UptimeSeconds() < 15 * 60) Task.Run(StartupChop);
+            if (Time.UptimeSeconds() < 15 * 60)
+            {
+                if (Conf.S.ChopOnStartup) Task.Run(StartupChop);
+                else Log.Info("Windows started: Salad not started (\"Start chopping when Windows starts\" is off).");
+            }
 
             Relay.OnCommand = (cmd, args) => Command(cmd, args, "website");
             Relay.OnConnected = () =>

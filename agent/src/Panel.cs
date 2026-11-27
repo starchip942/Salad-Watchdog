@@ -107,7 +107,7 @@ namespace GpuWatchdog
                             { "importSteam", s.ImportSteam }, { "importGameFolders", s.ImportGameFolders },
                             { "screenOffDelaySec", s.ScreenOffDelaySec }, { "screenOffEvenIfLightsFail", s.ScreenOffEvenIfLightsFail },
                             { "showEarningsOnWebsite", s.ShowEarningsOnWebsite }, { "viewRequiresPassword", s.ViewRequiresPassword },
-                            { "startHiddenInTray", s.StartHiddenInTray }, { "hideSaladTrayIcon", s.HideSaladTrayIcon }, { "sampleSecondsIdle", s.SampleSecondsIdle },
+                            { "startHiddenInTray", s.StartHiddenInTray }, { "chopOnStartup", s.ChopOnStartup }, { "hideSaladTrayIcon", s.HideSaladTrayIcon }, { "sampleSecondsIdle", s.SampleSecondsIdle },
                             { "autoOffEnabled", s.AutoOffEnabled }, { "autoOffTime", s.AutoOffTime }, { "autoOffWarnMinutes", s.AutoOffWarnMinutes },
                             { "relayUrl", s.RelayUrl }, { "dataFolder", Paths.Root } } },
                         { "hold", a.Hold }, { "pausedForGame", a.PausedForGame }, { "oldWatchdog", a.OldWatchdogRunning }, { "pauseUnsupported", a.PauseUnsupported },
@@ -232,6 +232,7 @@ namespace GpuWatchdog
             bool vr = s.ViewRequiresPassword;
             s.ViewRequiresPassword = B("viewRequiresPassword", s.ViewRequiresPassword);
             s.StartHiddenInTray = B("startHiddenInTray", s.StartHiddenInTray);
+            s.ChopOnStartup = B("chopOnStartup", s.ChopOnStartup);
             bool hadTray = s.HideSaladTrayIcon;
             s.HideSaladTrayIcon = B("hideSaladTrayIcon", s.HideSaladTrayIcon);
             if (hadTray && !s.HideSaladTrayIcon) SaladTray.Show(); else if (!hadTray && s.HideSaladTrayIcon) SaladTray.Hide();
@@ -251,6 +252,9 @@ namespace GpuWatchdog
                 if (changes.Contains("autoOffEnabled") && s.AutoOffEnabled) Agent.I.AutoOff.Arm("PC panel");
                 else if (changes.Contains("autoOffEnabled") || changes.Contains("autoOffTime")) Agent.I.AutoOff.SettingsChanged();
             }
+            if (changes.Contains("chopOnStartup"))
+                Log.Info(s.ChopOnStartup ? "Start chopping when Windows starts: on. After each boot, Salad opens and starts chopping by itself."
+                                         : "Start chopping when Windows starts: off. After a boot, Salad stays as it is until you press Chop Now.");
             if (changes.Any(c => c.StartsWith("safety"))) Log.Info($"Safety settings changed on the PC: {(s.SafetyEnabled ? "on" : "OFF")}, sensor {s.SafetySensor}, core {s.SafetyCoreLimitC} °C, hotspot {s.SafetyHotspotLimitC} °C, CPU {s.SafetyCpuLimitC} °C, {s.SafetySamples} readings.");
             if (changes.Contains("importSteam") || changes.Contains("importGameFolders")) Games.Rescan(true);
             if (vr != s.ViewRequiresPassword) Agent.I.Relay.Send(new Dictionary<string, object> { { "type", "info" }, { "viewRequiresPassword", s.ViewRequiresPassword } });
